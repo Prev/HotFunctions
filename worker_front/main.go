@@ -59,6 +59,8 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	startTime := makeTimestamp()
+
 	functionName := nameParam[0]
 	targetImageName := imageTagName(functionName)
 
@@ -86,9 +88,7 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	startTime := makeTimestamp()
 	out, err := runContainer(targetImageName)
-	endTime := makeTimestamp()
 
 	if err != nil {
 		resp := failResponse{true, err.Error()}
@@ -96,6 +96,8 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Write(bytes)
 		return
 	}
+
+	endTime := makeTimestamp()
 
 	resp := successResponse{
 		out.Body,

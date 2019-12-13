@@ -31,7 +31,7 @@ func imageTagName(functionName string) string {
 func runContainer(imageName string) (*lambdaResponse, error) {
 	ctx := context.Background()
 
-	containerName := fmt.Sprintf("%s_%d", imageName, rand.Intn(10000))
+	containerName := fmt.Sprintf("%s_%d", imageName, rand.Intn(1000000))
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
@@ -95,7 +95,6 @@ func buildImageWithTar(functionName string, tarPath string) error {
 	defer cancel()
 
 	opt := types.ImageBuildOptions{
-		// Dockerfile: functionName + "/Dockerfile",
 		Dockerfile: "/Dockerfile",
 		Tags:       []string{imageTagName(functionName)},
 	}
