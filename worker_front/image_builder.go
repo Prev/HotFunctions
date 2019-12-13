@@ -61,10 +61,11 @@ func downloadFile(sess *session.Session, functionName string) (string, error) {
 	os.RemoveAll(destPath)
 
 	file, err := os.Create(filePath)
+	defer file.Close()
+
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
 
 	downloader := s3manager.NewDownloader(sess)
 	_, err = downloader.Download(file,
@@ -86,10 +87,11 @@ func downloadFile(sess *session.Session, functionName string) (string, error) {
 
 func getConfigOfTheFunction(functionPath string) (map[string]string, error) {
 	jsonFile, err := os.Open(functionPath + "/config.json")
+	defer jsonFile.Close()
+
 	if err != nil {
 		return nil, err
 	}
-	defer jsonFile.Close()
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	var result map[string]string
@@ -99,29 +101,23 @@ func getConfigOfTheFunction(functionPath string) (map[string]string, error) {
 }
 
 func makeTarFile(functionPath string, envType string) (string, error) {
+	fileList := []string{}
+
 	envDir := envPathPrefix + envType
 	entries, err := ioutil.ReadDir(envDir)
 	if err != nil {
 		return "", err
 	}
 	for _, entry := range entries {
-		sourcePath := envDir + "/" + entry.Name()
-		destPath := functionPath + "/" + entry.Name()
-
-		if err := copyFile(sourcePath, destPath); err != nil {
-			return "", err
-		}
+		fileList = append(fileList, envDir+"/"+entry.Name())
 	}
-
-	tarFilePath := functionPath + ".tar"
-	os.RemoveAll(tarFilePath)
-
-	fileList := []string{}
 
 	entries, _ = ioutil.ReadDir(functionPath)
 	for _, entry := range entries {
 		fileList = append(fileList, functionPath+"/"+entry.Name())
 	}
+	tarFilePath := functionPath + ".tar"
+	os.RemoveAll(tarFilePath)
 
 	t := archiver.Tar{}
 	if err := t.Archive(fileList, tarFilePath); err != nil {

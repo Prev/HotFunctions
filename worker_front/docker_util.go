@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"strconv"
@@ -106,9 +105,7 @@ func buildImageWithTar(functionName string, tarPath string) error {
 		return err
 	}
 
-	_, err = io.Copy(os.Stdout, out.Body)
-	if err != nil {
-		log.Fatal(err, " :unable to read image build response")
+	if _, err := io.Copy(os.Stdout, out.Body); err != nil {
 		return err
 	}
 
