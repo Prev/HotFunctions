@@ -1,18 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"math/rand"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
 
@@ -51,13 +46,6 @@ type successResponse struct {
 	InternalExecutionTime int64
 }
 
-type lambdaResponse struct {
-	StatusCode int64  `json:"statusCode"`
-	StartTime  int64  `json:"startTime"`
-	EndTime    int64  `json:"endTime"`
-	Body       string `json:"body"`
-}
-
 func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
 	nameParam := q["name"]
@@ -65,91 +53,56 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	if len(nameParam) == 0 {
-		resp := failResponse{false, "param 'name' is not given"}
+		resp := failResponse{true, "param 'name' is not given"}
 		bytes, _ := json.Marshal(resp)
 		w.Write(bytes)
 		return
 	}
 
+	functionName := nameParam[0]
+	targetImageName := imageTagName(functionName)
+
+	imageFound := false
 	images, _ := cli.ImageList(context.Background(), types.ImageListOptions{})
 
 	for _, image := range images {
-		splitted := strings.Split(image.RepoTags[0], ":")
-		imageName := splitted[0]
+		if len(image.RepoTags) > 0 {
+			splitted := strings.Split(image.RepoTags[0], ":")
 
-		if imageName == nameParam[0] {
-			startTime := makeTimestamp()
-			log := runContainer(imageName)
-			endTime := makeTimestamp()
-
-			// Magic strings
-			tmp := strings.Split(log, "-----")
-			jsonLength, _ := strconv.ParseInt(tmp[1], 10, 64)
-			idx := strings.Index(log, "-----=")
-			jsonStr := log[idx+6 : idx+6+int(jsonLength)]
-
-			var lr lambdaResponse
-			err := json.Unmarshal([]byte(jsonStr), &lr)
-
-			if err != nil {
-				panic(err)
+			if len(splitted) > 0 && splitted[0] == targetImageName {
+				imageFound = true
+				break
 			}
+		}
+	}
 
-			resp := successResponse{
-				lr.Body,
-				true,
-				endTime - startTime,
-				lr.EndTime - lr.StartTime,
-			}
+	// build image if image not exist
+	if imageFound == false {
+		if err := buildImage(functionName); err != nil {
+			resp := failResponse{true, err.Error()}
 			bytes, _ := json.Marshal(resp)
 			w.Write(bytes)
 			return
 		}
 	}
 
-	// TODO: automatic build image
+	startTime := makeTimestamp()
+	out, err := runContainer(targetImageName)
+	endTime := makeTimestamp()
 
-	resp := failResponse{false, "fail to find image " + nameParam[0]}
+	if err != nil {
+		resp := failResponse{true, err.Error()}
+		bytes, _ := json.Marshal(resp)
+		w.Write(bytes)
+		return
+	}
+
+	resp := successResponse{
+		out.Body,
+		imageFound,
+		endTime - startTime,
+		out.EndTime - out.StartTime,
+	}
 	bytes, _ := json.Marshal(resp)
 	w.Write(bytes)
-}
-
-func runContainer(imageName string) string {
-	ctx := context.Background()
-
-	containerName := fmt.Sprintf("%s_%d", imageName, rand.Intn(10000))
-
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: imageName,
-	}, nil, nil, containerName)
-
-	if err != nil {
-		panic(err)
-	}
-
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		panic(err)
-	}
-
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			panic(err)
-		}
-	case <-statusCh:
-	}
-
-	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
-	if err != nil {
-		panic(err)
-	}
-
-	if err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{}); err != nil {
-		panic(err)
-	}
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(out)
-	return buf.String()
 }

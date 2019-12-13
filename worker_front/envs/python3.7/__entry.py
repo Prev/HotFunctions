@@ -1,5 +1,5 @@
 import os
-from user_code import lambda_handler
+from main import lambda_handler
 import time
 import json
 
