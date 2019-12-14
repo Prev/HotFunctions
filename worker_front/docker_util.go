@@ -111,3 +111,26 @@ func buildImageWithTar(functionName string, tarPath string) error {
 
 	return nil
 }
+
+func removeOldImages() error {
+	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	now := time.Now().Unix()
+
+	for _, image := range images {
+		imageName := strings.Split(image.RepoTags[0], ":")[0]
+		if imageName[0:5] == "lalb_" && now-imageLastUsedTime[imageName] > IMAGE_ALIVE_SEC {
+			_, err := cli.ImageRemove(context.Background(), image.ID, types.ImageRemoveOptions{
+				Force: true,
+			})
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

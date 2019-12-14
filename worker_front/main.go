@@ -12,12 +12,17 @@ import (
 )
 
 var cli *client.Client
+var imageLastUsedTime map[string]int64
+
+const IMAGE_ALIVE_SEC = 30
 
 func makeTimestamp() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
 func main() {
+	imageLastUsedTime = make(map[string]int64)
+
 	var err error
 	cli, err = client.NewClientWithOpts(client.WithVersion("1.40"))
 
@@ -107,4 +112,9 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	bytes, _ := json.Marshal(resp)
 	w.Write(bytes)
+
+	imageLastUsedTime[targetImageName] = time.Now().Unix()
+	if err := removeOldImages(); err != nil {
+		println(err)
+	}
 }
