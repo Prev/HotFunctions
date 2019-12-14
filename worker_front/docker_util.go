@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -118,11 +119,23 @@ func removeOldImages() error {
 		panic(err)
 	}
 
-	now := time.Now().Unix()
+	tmp := make([]string, 0, len(cachedImages))
+	for key, val := range cachedImages {
+		tmp = append(tmp, strconv.FormatInt(val, 10)+":"+key)
+	}
+	sort.Strings(tmp)
+
+	for i := 0; i < len(tmp)-IMAGE_CACHE_NUM; i++ {
+		spliited := strings.Split(tmp[i], ":")
+		key := spliited[1]
+		delete(cachedImages, key)
+	}
 
 	for _, image := range images {
 		imageName := strings.Split(image.RepoTags[0], ":")[0]
-		if imageName[0:5] == "lalb_" && now-imageLastUsedTime[imageName] > IMAGE_ALIVE_SEC {
+		_, exists := cachedImages[imageName]
+
+		if imageName[0:5] == "lalb_" && exists == false {
 			_, err := cli.ImageRemove(context.Background(), image.ID, types.ImageRemoveOptions{
 				Force: true,
 			})
