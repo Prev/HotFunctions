@@ -15,6 +15,7 @@ var cli *client.Client
 var cachedImages map[string]int64
 
 const IMAGE_CACHE_NUM = 2
+const REQUEST_API_KEY = "CS530"
 
 func makeTimestamp() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
@@ -55,8 +56,16 @@ type successResponse struct {
 func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
 	nameParam := q["name"]
+	apiKeyParam := q["key"]
 
 	w.Header().Add("Content-Type", "application/json")
+
+	if len(apiKeyParam) == 0 || apiKeyParam[0] != REQUEST_API_KEY {
+		resp := failResponse{true, "param 'key' is not given or not valid"}
+		bytes, _ := json.Marshal(resp)
+		w.Write(bytes)
+		return
+	}
 
 	if len(nameParam) == 0 {
 		resp := failResponse{true, "param 'name' is not given"}
