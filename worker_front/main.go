@@ -77,6 +77,8 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	startTime := makeTimestamp()
 
 	functionName := nameParam[0]
+	println("function requested:", functionName)
+
 	targetImageName := imageTagName(functionName)
 
 	imageFound := false

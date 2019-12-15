@@ -6,51 +6,40 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Node struct {
-	id          int
-	ip          string
-	maxCapacity int
-	running     []string
-	endTimes    []int
+	id               int
+	url              string
+	maxCapacity      int
+	running          []string
+	distinctFuncsLog []int
+	warmColdLogs     []bool // true: warm, false: cold
 }
 
-func newNode(id int, ip string, maxCapacity int) *Node {
+func newNode(id int, url string, maxCapacity int) *Node {
 	n := new(Node)
 	n.id = id
-	n.ip = ip
+	n.url = url
 	n.maxCapacity = maxCapacity
 	n.running = make([]string, 0, maxCapacity)
-	n.endTimes = make([]int, 0, maxCapacity)
+	n.distinctFuncsLog = make([]int, 0, 1000)
+	n.warmColdLogs = make([]bool, 0, 1000)
 
 	return n
 }
 
-var nodes [](*Node)
-
-func getFinishedFunctions(node *Node, currentTimestamp int) []string {
-	finished := make([]string, 0, len(node.running))
-
-	for i, time := range node.endTimes {
-		if currentTimestamp >= time {
-			finished = append(finished, node.running[i])
-		}
-	}
-
-	return finished
-}
-
-func setFinished(node *Node, functionName string) {
-	// println(functionName, "is finished")
+func (node *Node) setFinished(functionName string) {
 	for i, name := range node.running {
 		if name == functionName {
 			node.running = append(node.running[:i], node.running[i+1:]...)
-			node.endTimes = append(node.endTimes[:i], node.endTimes[i+1:]...)
 			return
 		}
 	}
 }
+
+var nodes [](*Node)
 
 func main() {
 	file, err := os.Open("data/events.csv")
@@ -60,29 +49,17 @@ func main() {
 		panic(err)
 	}
 
-	nodes = make([]*Node, 0, 8)
-	var distinctsPerNode [8][]int
-
-	for i := 0; i < 8; i++ {
-		nodes = append(nodes, newNode(i, "", 8))
-		distinctsPerNode[i] = make([]int, 0, 60000)
+	nodes = make([]*Node, 0, 2)
+	for i := 0; i < 2; i++ {
+		nodes = append(nodes, newNode(i, "http://localhost:5000", 8))
 	}
 
 	rdr := csv.NewReader(bufio.NewReader(file))
 	rows, _ := rdr.ReadAll()
 
 	i := 0
-	for time := 0; time <= 60000; {
-		for ni, n := range nodes {
-			for _, fn := range getFinishedFunctions(n, time) {
-				setFinished(n, fn)
-			}
-			distincts := make(map[string]bool)
-			for _, f := range n.running {
-				distincts[f] = true
-			}
-			distinctsPerNode[ni] = append(distinctsPerNode[ni], len(distincts))
-		}
+	for tick := 0; tick <= 60000; {
+		logDistinctFunctionsCounts()
 
 		if i >= len(rows) {
 			break
@@ -90,29 +67,36 @@ func main() {
 		row := rows[i]
 		startTime, _ := strconv.Atoi(row[1])
 
-		if time == startTime {
+		if tick >= startTime {
+			name := row[0]
 			node := leastLoaded()
 
-			name := row[0]
-			duration, _ := strconv.Atoi(row[2])
-			endTime := startTime + duration
-
-			node.running = append(node.running, name)
-			node.endTimes = append(node.endTimes, endTime)
-
-			// println(name, "is running at", node.id)
+			if name == "W1" || name == "W2" || name == "W3" {
+				go runFunction(node, name)
+			}
 			i += 1
 
 		} else {
-			time += 1
+			tick += 10
+			time.Sleep(time.Second / 3)
 		}
 	}
 
-	for i, dn := range distinctsPerNode {
+	for i, node := range nodes {
 		sum := 0
-		for _, n := range dn {
+		for _, n := range node.distinctFuncsLog {
 			sum += n
 		}
-		fmt.Printf("node %d: %.2f\n", i, float32(sum)/float32(len(dn)))
+		fmt.Printf("node %d: %.2f\n", i, float32(sum)/float32(len(node.distinctFuncsLog)))
+	}
+}
+
+func logDistinctFunctionsCounts() {
+	for _, n := range nodes {
+		distincts := make(map[string]bool)
+		for _, f := range n.running {
+			distincts[f] = true
+		}
+		n.distinctFuncsLog = append(n.distinctFuncsLog, len(distincts))
 	}
 }
