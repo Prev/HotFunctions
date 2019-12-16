@@ -4,7 +4,7 @@ mkdir _artifacts
 for D in *; do
     if [ -d "${D}" ]; then
     	if [ ! "${D}" = "_artifacts" ]; then
-    		zip "_artifacts/${D}.zip" "${D}"/*
+    		zip "_artifacts/${D}.zip" "${D}"/* "${D}"/**/*
 		fi
     fi
 done

@@ -135,7 +135,7 @@ func removeOldImages() error {
 		imageName := strings.Split(image.RepoTags[0], ":")[0]
 		_, exists := cachedImages[imageName]
 
-		if imageName[0:5] == "lalb_" && exists == false {
+		if len(imageName) > 5 && imageName[0:5] == "lalb_" && exists == false {
 			_, err := cli.ImageRemove(context.Background(), image.ID, types.ImageRemoveOptions{
 				Force: true,
 			})
