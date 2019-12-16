@@ -18,9 +18,13 @@ import (
 )
 
 type lambdaResponse struct {
-	StatusCode int64  `json:"statusCode"`
-	StartTime  int64  `json:"startTime"`
-	EndTime    int64  `json:"endTime"`
+	StartTime int64                `json:"startTime"`
+	EndTime   int64                `json:"endTime"`
+	Result    lambdaResponseResult `json:"result"`
+}
+
+type lambdaResponseResult struct {
+	StatusCode int    `json:"statusCode"`
 	Body       string `json:"body"`
 }
 

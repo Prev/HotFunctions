@@ -47,7 +47,7 @@ type failResponse struct {
 }
 
 type successResponse struct {
-	Result                string
+	Result                lambdaResponseResult
 	IsWarm                bool
 	ExecutionTime         int64
 	InternalExecutionTime int64
@@ -117,7 +117,7 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	endTime := makeTimestamp()
 
 	resp := successResponse{
-		out.Body,
+		out.Result,
 		imageFound,
 		endTime - startTime,
 		out.EndTime - out.StartTime,
