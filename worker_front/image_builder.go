@@ -15,7 +15,6 @@ import (
 
 const sampleFunctionsBucket = "lalb-sample-functions"
 const downloadPathPrefix = "_downloads/"
-const sourcePathPrefix = "_functions/"
 const envPathPrefix = "envs/"
 
 func buildImage(functionName string) error {
@@ -54,13 +53,13 @@ func buildImage(functionName string) error {
 
 func downloadFile(sess *session.Session, functionName string) (string, error) {
 	os.MkdirAll(downloadPathPrefix, 0700)
-	filePath := downloadPathPrefix + functionName + ".zip"
-	destPath := sourcePathPrefix + functionName
+	zipFilePath := downloadPathPrefix + functionName + ".zip"
+	destPath := downloadPathPrefix + functionName
 
-	os.RemoveAll(filePath)
+	os.RemoveAll(zipFilePath)
 	os.RemoveAll(destPath)
 
-	file, err := os.Create(filePath)
+	file, err := os.Create(zipFilePath)
 	defer file.Close()
 
 	if err != nil {
@@ -79,9 +78,11 @@ func downloadFile(sess *session.Session, functionName string) (string, error) {
 	}
 
 	z := archiver.Zip{}
-	if err := z.Unarchive(filePath, sourcePathPrefix); err != nil {
+	if err := z.Unarchive(zipFilePath, downloadPathPrefix); err != nil {
 		return "", err
 	}
+	os.RemoveAll(zipFilePath)
+
 	return destPath, nil
 }
 
