@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,38 +25,50 @@ func makeTimestamp() int64 {
 }
 
 func main() {
-	// imageLastUsedTime = make(map[string]int64)
 	cachedImages = make(map[string]int64)
 
 	var err error
 	cli, err = client.NewClientWithOpts(client.WithVersion("1.40"))
-
 	if err != nil {
 		panic(err)
 	}
 
-	println("server listening at :5000")
-	http.Handle("/", new(frontHandler))
-	http.ListenAndServe(":5000", nil)
+	port := 8222
+	if len(os.Args) >= 2 {
+		port, err = strconv.Atoi(os.Args[1])
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	fmt.Printf("server listening at :%d\n", port)
+	http.Handle("/", new(FrontHandler))
+	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
 
-type frontHandler struct {
+type FrontHandler struct {
 	http.Handler
 }
 
-type failResponse struct {
+type FailResponse struct {
 	Error   bool
 	Message string
 }
 
-type successResponse struct {
+type SuccessResponse struct {
 	Result                lambdaResponseResult
 	IsWarm                bool
 	ExecutionTime         int64
 	InternalExecutionTime int64
 }
 
-func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func writeFailResponse(w *http.ResponseWriter, message string) {
+	resp := FailResponse{true, message}
+	bytes, _ := json.Marshal(resp)
+	(*w).Write(bytes)
+}
+
+func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
 	nameParam := q["name"]
 	apiKeyParam := q["key"]
@@ -61,28 +76,28 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	if len(apiKeyParam) == 0 || apiKeyParam[0] != REQUEST_API_KEY {
-		resp := failResponse{true, "param 'key' is not given or not valid"}
-		bytes, _ := json.Marshal(resp)
-		w.Write(bytes)
+		writeFailResponse(&w, "param 'key' is not given or not valid")
 		return
 	}
 
 	if len(nameParam) == 0 {
-		resp := failResponse{true, "param 'name' is not given"}
-		bytes, _ := json.Marshal(resp)
-		w.Write(bytes)
+		writeFailResponse(&w, "param 'name' is not given")
 		return
 	}
+
+	println("function requested:", nameParam[0])
 
 	startTime := makeTimestamp()
 
 	functionName := nameParam[0]
-	println("function requested:", functionName)
-
 	targetImageName := imageTagName(functionName)
 
 	imageFound := false
-	images, _ := cli.ImageList(context.Background(), types.ImageListOptions{})
+	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	if err != nil {
+		writeFailResponse(&w, err.Error())
+		return
+	}
 
 	for _, image := range images {
 		if len(image.RepoTags) > 0 {
@@ -97,26 +112,22 @@ func (h *frontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// build image if image not exist
 	if imageFound == false {
+		fmt.Printf("Image '%s' not found. Start to build\n", targetImageName)
 		if err := buildImage(functionName); err != nil {
-			resp := failResponse{true, err.Error()}
-			bytes, _ := json.Marshal(resp)
-			w.Write(bytes)
+			writeFailResponse(&w, err.Error())
 			return
 		}
 	}
 
 	out, err := runContainer(targetImageName)
-
 	if err != nil {
-		resp := failResponse{true, err.Error()}
-		bytes, _ := json.Marshal(resp)
-		w.Write(bytes)
+		writeFailResponse(&w, err.Error())
 		return
 	}
 
 	endTime := makeTimestamp()
 
-	resp := successResponse{
+	resp := SuccessResponse{
 		out.Result,
 		imageFound,
 		endTime - startTime,

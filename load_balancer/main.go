@@ -3,63 +3,35 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
 )
 
-type Node struct {
-	id               int
-	url              string
-	maxCapacity      int
-	running          []string
-	distinctFuncsLog []int
-	warmColdLogs     []bool // true: warm, false: cold
+type NodeConfigData struct {
+	Url         string `json:"url"`
+	MaxCapacity int    `json:"maxCapacity"`
 }
-
-func newNode(id int, url string, maxCapacity int) *Node {
-	n := new(Node)
-	n.id = id
-	n.url = url
-	n.maxCapacity = maxCapacity
-	n.running = make([]string, 0, maxCapacity)
-	n.distinctFuncsLog = make([]int, 0, 1000)
-	n.warmColdLogs = make([]bool, 0, 1000)
-
-	return n
-}
-
-func (node *Node) setFinished(functionName string) {
-	for i, name := range node.running {
-		if name == functionName {
-			node.running = append(node.running[:i], node.running[i+1:]...)
-			return
-		}
-	}
-}
-
-var nodes [](*Node)
 
 func main() {
-	file, err := os.Open("data/events.csv")
-	defer file.Close()
+	nodes := initNodesFromConfig("nodes.config.json")
+	logger := newLogger(&nodes)
 
+	file, err := os.Open("data/events.csv")
 	if err != nil {
 		panic(err)
 	}
-
-	nodes = make([]*Node, 0, 2)
-	for i := 0; i < 2; i++ {
-		nodes = append(nodes, newNode(i, "http://localhost:5000", 8))
-	}
+	defer file.Close()
 
 	rdr := csv.NewReader(bufio.NewReader(file))
 	rows, _ := rdr.ReadAll()
 
 	i := 0
 	for tick := 0; tick <= 60000; {
-		logDistinctFunctionsCounts()
+		logger.logDistinctFunctionsCounts()
 
 		if i >= len(rows) {
 			break
@@ -69,10 +41,12 @@ func main() {
 
 		if tick >= startTime {
 			name := row[0]
-			node := leastLoaded()
+			node, err := leastLoaded(&nodes)
 
-			if name == "W1" || name == "W2" || name == "W3" {
-				go runFunction(node, name)
+			if err != nil {
+				fmt.Printf("[fail running] %s: %s\n", name, err.Error())
+			} else if name == "W1" || name == "W2" || name == "W3" || name == "W4" || name == "W5" {
+				go node.runFunction(name)
 			}
 			i += 1
 
@@ -82,21 +56,30 @@ func main() {
 		}
 	}
 
-	for i, node := range nodes {
+	for i, _ := range nodes {
 		sum := 0
-		for _, n := range node.distinctFuncsLog {
-			sum += n
+		for j := 0; j < logger.curIndex; j++ {
+			sum += logger.distinctFuncs[i][j]
 		}
-		fmt.Printf("node %d: %.2f\n", i, float32(sum)/float32(len(node.distinctFuncsLog)))
+		fmt.Printf("node %d: %.2f\n", i, float32(sum)/float32(logger.curIndex))
 	}
 }
 
-func logDistinctFunctionsCounts() {
-	for _, n := range nodes {
-		distincts := make(map[string]bool)
-		for _, f := range n.running {
-			distincts[f] = true
-		}
-		n.distinctFuncsLog = append(n.distinctFuncsLog, len(distincts))
+func initNodesFromConfig(configFilePath string) []*Node {
+	nodeConfigFile, err := os.Open(configFilePath)
+	if err != nil {
+		panic(err)
 	}
+	defer nodeConfigFile.Close()
+
+	var nodeConfigs []NodeConfigData
+	byteValue, _ := ioutil.ReadAll(nodeConfigFile)
+	json.Unmarshal([]byte(byteValue), &nodeConfigs)
+
+	tmp := make([]*Node, len(nodeConfigs))
+	for i, nc := range nodeConfigs {
+		tmp[i] = newNode(i, nc.Url, nc.MaxCapacity)
+	}
+	// nodes = &tmp
+	return tmp
 }

@@ -23,27 +23,24 @@ func buildImage(functionName string) error {
 	}))
 
 	// Download files of the function
-	println("Download file from S3")
 	functionPath, err := downloadFile(sess, functionName)
 	if err != nil {
 		return err
 	}
 
 	// Read config.json file
-	println("Reading config...")
 	config, err := getConfigOfTheFunction(functionPath)
 	if err != nil {
 		return err
 	}
 
-	println("Making tar file...")
+	// Make tar file for docker
 	tarPath, err := makeTarFile(functionPath, config["environment"])
 	if err != nil {
 		return err
 	}
 
 	// Build docker image
-	println("Build image...")
 	if err := buildImageWithTar(functionName, tarPath); err != nil {
 		return err
 	}
@@ -88,11 +85,10 @@ func downloadFile(sess *session.Session, functionName string) (string, error) {
 
 func getConfigOfTheFunction(functionPath string) (map[string]string, error) {
 	jsonFile, err := os.Open(functionPath + "/config.json")
-	defer jsonFile.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer jsonFile.Close()
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	var result map[string]string

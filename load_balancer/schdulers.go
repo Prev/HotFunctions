@@ -1,10 +1,12 @@
 package main
 
-func leastLoaded() *Node {
+import "errors"
+
+func leastLoaded(nodes *[]*Node) (*Node, error) {
 	selected := -1
 	minUsed := 999999
 
-	for i, node := range nodes {
+	for i, node := range *nodes {
 		used := len(node.running)
 		if used >= node.maxCapacity {
 			continue
@@ -16,8 +18,9 @@ func leastLoaded() *Node {
 	}
 
 	if selected == -1 {
-		panic("no available node found")
+		// panic("no available node found")
+		return nil, errors.New("no available node found")
 	}
 
-	return nodes[selected]
+	return (*nodes)[selected], nil
 }
