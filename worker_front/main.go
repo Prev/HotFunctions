@@ -133,6 +133,7 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	endTime := makeTimestamp()
+	println("fin", functionName)
 
 	resp := SuccessResponse{
 		out.Result,
@@ -143,7 +144,7 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	bytes, _ := json.Marshal(resp)
 	w.Write(bytes)
 
-	handleCachedImages(targetImageName)
+	go handleCachedImages(targetImageName)
 }
 
 func handleCachedImages(imageName string) {
@@ -151,7 +152,7 @@ func handleCachedImages(imageName string) {
 	cachedImages[imageName] = time.Now().Unix()
 
 	if err := removeOldImages(); err != nil {
-		println(err.Error())
+		//println(err.Error())
 	}
 
 	mutex.Unlock()

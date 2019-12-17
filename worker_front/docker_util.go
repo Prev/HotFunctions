@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"sort"
@@ -104,15 +105,17 @@ func buildImageWithTar(functionName string, tarPath string) error {
 	}
 
 	out, err := cli.ImageBuild(ctx, dockerBuildContext, opt)
-	defer out.Body.Close()
+	//defer out.Body.Close()
 
 	if err != nil {
 		return err
 	}
+	io.Copy(ioutil.Discard, out.Body)
+	out.Body.Close()
 
-	if _, err := io.Copy(os.Stdout, out.Body); err != nil {
-		return err
-	}
+	//if _, err := io.Copy(os.Stdout, out.Body); err != nil {
+	//	return err
+	//}
 
 	return nil
 }
