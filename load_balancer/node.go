@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
+	"log"
 	"net/http"
 	"time"
 )
@@ -13,7 +13,7 @@ type Node struct {
 	id          int
 	url         string
 	maxCapacity int
-	running     map[string]string
+	running     int
 }
 
 func newNode(id int, url string, maxCapacity int) *Node {
@@ -21,7 +21,7 @@ func newNode(id int, url string, maxCapacity int) *Node {
 	n.id = id
 	n.url = url
 	n.maxCapacity = maxCapacity
-	n.running = make(map[string]string)
+	n.running = 0
 
 	return n
 }
@@ -33,12 +33,11 @@ type workerResponse struct {
 	InternalExecutionTime int64
 }
 
-func (node *Node) runFunction(functionName string) {
+func (node *Node) runFunction(functionName string, logger *log.Logger) {
 	fmt.Printf("[run] %s at %d\n", functionName, node.id)
 
 	startTime := time.Now().UnixNano()
-	uid := fmt.Sprintf("%s-%d-%d", functionName, startTime, rand.Intn(100000))
-	node.running[uid] = functionName
+	node.running++
 
 	resp, err := http.Get(node.url + "?key=CS530&name=" + functionName)
 	if err != nil {
@@ -67,5 +66,8 @@ func (node *Node) runFunction(functionName string) {
 	fmt.Printf("[finished] %s in %dms, %s start, latency %dms\n",
 		functionName, duration, startType, latency)
 
-	delete(node.running, uid)
+	log := fmt.Sprintf("%d %d %s %s %d %d", endTime/1000, node.id, functionName, startType, duration, latency)
+	logger.Output(2, log)
+
+	node.running--
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -16,6 +17,7 @@ import (
 
 var cli *client.Client
 var cachedImages map[string]int64
+var mutex *sync.Mutex
 
 const IMAGE_CACHE_NUM = 2
 const REQUEST_API_KEY = "CS530"
@@ -26,6 +28,7 @@ func makeTimestamp() int64 {
 
 func main() {
 	cachedImages = make(map[string]int64)
+	mutex = new(sync.Mutex)
 
 	var err error
 	cli, err = client.NewClientWithOpts(client.WithVersion("1.40"))
@@ -43,7 +46,11 @@ func main() {
 
 	fmt.Printf("server listening at :%d\n", port)
 	http.Handle("/", new(FrontHandler))
-	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+
+	if err != nil {
+		panic(err)
+	}
 }
 
 type FrontHandler struct {
@@ -136,10 +143,16 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	bytes, _ := json.Marshal(resp)
 	w.Write(bytes)
 
-	// imageLastUsedTime[targetImageName] = time.Now().Unix()
-	cachedImages[targetImageName] = time.Now().Unix()
+	handleCachedImages(targetImageName)
+}
+
+func handleCachedImages(imageName string) {
+	mutex.Lock()
+	cachedImages[imageName] = time.Now().Unix()
 
 	if err := removeOldImages(); err != nil {
-		println(err)
+		println(err.Error())
 	}
+
+	mutex.Unlock()
 }

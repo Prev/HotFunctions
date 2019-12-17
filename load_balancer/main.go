@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -18,21 +19,25 @@ type NodeConfigData struct {
 
 func main() {
 	nodes := initNodesFromConfig("nodes.config.json")
-	logger := newLogger(&nodes)
 
-	file, err := os.Open("data/events.csv")
+	fileEvents, err := os.Open("data/events.csv")
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
-
-	rdr := csv.NewReader(bufio.NewReader(file))
+	defer fileEvents.Close()
+	rdr := csv.NewReader(bufio.NewReader(fileEvents))
 	rows, _ := rdr.ReadAll()
 
-	i := 0
-	for tick := 0; tick <= 60000; {
-		logger.logDistinctFunctionsCounts()
+	outputFile, err := os.OpenFile("log.out", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	myLogger := log.New(outputFile, "", log.Ldate|log.Ltime)
 
+	num := 0
+	i := 0
+	for tick := 0; tick <= 20000; {
 		if i >= len(rows) {
 			break
 		}
@@ -45,24 +50,20 @@ func main() {
 
 			if err != nil {
 				fmt.Printf("[fail running] %s: %s\n", name, err.Error())
-			} else if name == "W1" || name == "W2" || name == "W3" || name == "W4" || name == "W5" {
-				go node.runFunction(name)
+			} else if name == "W1" || name == "W2" || name == "W3" || name == "W4" || name == "W5" || name == "W6" || name == "W7" {
+				num += 1
+				go node.runFunction(name, myLogger)
 			}
 			i += 1
 
 		} else {
 			tick += 10
-			time.Sleep(time.Second / 3)
+			time.Sleep(time.Second / 100)
 		}
 	}
 
-	for i, _ := range nodes {
-		sum := 0
-		for j := 0; j < logger.curIndex; j++ {
-			sum += logger.distinctFuncs[i][j]
-		}
-		fmt.Printf("node %d: %.2f\n", i, float32(sum)/float32(logger.curIndex))
-	}
+	time.Sleep(time.Second * 20)
+	println(num)
 }
 
 func initNodesFromConfig(configFilePath string) []*Node {
@@ -76,10 +77,9 @@ func initNodesFromConfig(configFilePath string) []*Node {
 	byteValue, _ := ioutil.ReadAll(nodeConfigFile)
 	json.Unmarshal([]byte(byteValue), &nodeConfigs)
 
-	tmp := make([]*Node, len(nodeConfigs))
+	nodes := make([]*Node, len(nodeConfigs))
 	for i, nc := range nodeConfigs {
-		tmp[i] = newNode(i, nc.Url, nc.MaxCapacity)
+		nodes[i] = newNode(i, nc.Url, nc.MaxCapacity)
 	}
-	// nodes = &tmp
-	return tmp
+	return nodes
 }
