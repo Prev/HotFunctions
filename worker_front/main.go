@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -17,7 +18,8 @@ import (
 
 var cli *client.Client
 var cachedImages map[string]int64
-var mutex *sync.Mutex
+var cachedImagesMutex *sync.Mutex
+var logger *log.Logger
 
 const IMAGE_CACHE_NUM = 2
 const REQUEST_API_KEY = "CS530"
@@ -28,7 +30,8 @@ func makeTimestamp() int64 {
 
 func main() {
 	cachedImages = make(map[string]int64)
-	mutex = new(sync.Mutex)
+	cachedImagesMutex = new(sync.Mutex)
+	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
 	var err error
 	cli, err = client.NewClientWithOpts(client.WithVersion("1.40"))
@@ -44,7 +47,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("server listening at :%d\n", port)
+	logger.Printf("server listening at :%d\n", port)
 	http.Handle("/", new(FrontHandler))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 
@@ -92,7 +95,7 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	println("function requested:", nameParam[0])
+	logger.Println("function requested:", nameParam[0])
 
 	startTime := makeTimestamp()
 
@@ -117,13 +120,33 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// build image if image not exist
+	// Build image if image not exist
 	if imageFound == false {
-		fmt.Printf("Image '%s' not found. Start to build\n", targetImageName)
+		// Target function is in building process by other connection.
+		// Wait until building finished
+	WAITING:
+		for cachedImages[targetImageName] == -1 {
+			time.Sleep(time.Second / 20)
+		}
+
+		cachedImagesMutex.Lock()
+		if cachedImages[targetImageName] == -1 {
+			cachedImagesMutex.Unlock()
+			goto WAITING
+		}
+
+		cachedImages[targetImageName] = -1
+		cachedImagesMutex.Unlock()
+
+		logger.Printf("Image '%s' not found. Start to build\n", targetImageName)
 		if err := buildImage(functionName); err != nil {
 			writeFailResponse(&w, err.Error())
 			return
 		}
+
+		cachedImagesMutex.Lock()
+		cachedImages[targetImageName] = 0
+		cachedImagesMutex.Unlock()
 	}
 
 	out, err := runContainer(targetImageName)
@@ -133,7 +156,7 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	endTime := makeTimestamp()
-	println("fin", functionName)
+	logger.Println("fin", functionName)
 
 	resp := SuccessResponse{
 		out.Result,
@@ -148,12 +171,12 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func handleCachedImages(imageName string) {
-	mutex.Lock()
+	cachedImagesMutex.Lock()
 	cachedImages[imageName] = time.Now().Unix()
 
 	if err := removeOldImages(); err != nil {
 		//println(err.Error())
 	}
 
-	mutex.Unlock()
+	cachedImagesMutex.Unlock()
 }

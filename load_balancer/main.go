@@ -28,7 +28,9 @@ func main() {
 	rdr := csv.NewReader(bufio.NewReader(fileEvents))
 	rows, _ := rdr.ReadAll()
 
-	outputFile, err := os.OpenFile("log.out", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	os.MkdirAll("logs", 0755)
+	logFileName := "logs/log-" + time.Now().Format("2006-01-02T15:04:05") + ".out"
+	outputFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		panic(err)
 	}

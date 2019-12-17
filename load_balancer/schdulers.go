@@ -7,7 +7,7 @@ func leastLoaded(nodes *[]*Node) (*Node, error) {
 	minUsed := 999999
 
 	for i, node := range *nodes {
-		used := node.running
+		used := int(node.running)
 		if used >= node.maxCapacity {
 			continue
 		}

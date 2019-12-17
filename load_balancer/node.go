@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync/atomic"
 	"time"
 )
 
@@ -13,7 +14,7 @@ type Node struct {
 	id          int
 	url         string
 	maxCapacity int
-	running     int
+	running     int64
 }
 
 func newNode(id int, url string, maxCapacity int) *Node {
@@ -27,31 +28,42 @@ func newNode(id int, url string, maxCapacity int) *Node {
 }
 
 type workerResponse struct {
-	Result                string
+	Result                lambdaResponseResult
 	IsWarm                bool
 	ExecutionTime         int64
 	InternalExecutionTime int64
+}
+type lambdaResponseResult struct {
+	StatusCode int    `json:"statusCode"`
+	Body       string `json:"body"`
 }
 
 func (node *Node) runFunction(functionName string, logger *log.Logger) {
 	fmt.Printf("[run] %s at %d\n", functionName, node.id)
 
 	startTime := time.Now().UnixNano()
-	node.running++
+	atomic.AddInt64(&node.running, 1)
 
 	resp, err := http.Get(node.url + "?key=CS530&name=" + functionName)
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
+	resp.Body.Close()
 
 	var result workerResponse
-	json.Unmarshal(data, &result)
+	if err := json.Unmarshal(data, &result); err != nil {
+		println(err.Error())
+		println(string(data))
+	}
+
+	if result.ExecutionTime == 0 {
+		println(string(data))
+	}
 
 	endTime := time.Now().UnixNano()
 	duration := (endTime - startTime) / int64(time.Millisecond)
@@ -63,11 +75,12 @@ func (node *Node) runFunction(functionName string, logger *log.Logger) {
 
 	latency := duration - result.InternalExecutionTime
 
-	fmt.Printf("[finished] %s in %dms, %s start, latency %dms\n",
-		functionName, duration, startType, latency)
+	fmt.Printf("[finished] %s in %dms, %s start, latency %dms - %d %d %s\n",
+		functionName, duration, startType, latency, result.ExecutionTime, result.InternalExecutionTime, result.Result.Body)
 
-	log := fmt.Sprintf("%d %d %s %s %d %d", endTime/1000, node.id, functionName, startType, duration, latency)
+	log := fmt.Sprintf("%d %s %s %d %d %d", node.id, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
 	logger.Output(2, log)
 
-	node.running--
+	// node.running--
+	atomic.AddInt64(&node.running, -1)
 }

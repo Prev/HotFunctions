@@ -36,7 +36,7 @@ func imageTagName(functionName string) string {
 func runContainer(imageName string) (*lambdaResponse, error) {
 	ctx := context.Background()
 
-	containerName := fmt.Sprintf("%s_%d", imageName, rand.Intn(1000000))
+	containerName := fmt.Sprintf("%s_%d_%d", imageName, time.Now().Unix(), rand.Intn(100000))
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
