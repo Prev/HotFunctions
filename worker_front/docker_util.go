@@ -105,7 +105,6 @@ func buildImageWithTar(functionName string, tarPath string) error {
 	}
 
 	out, err := cli.ImageBuild(ctx, dockerBuildContext, opt)
-	//defer out.Body.Close()
 
 	if err != nil {
 		return err
@@ -113,19 +112,10 @@ func buildImageWithTar(functionName string, tarPath string) error {
 	io.Copy(ioutil.Discard, out.Body)
 	out.Body.Close()
 
-	//if _, err := io.Copy(os.Stdout, out.Body); err != nil {
-	//	return err
-	//}
-
 	return nil
 }
 
-func removeOldImages() error {
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
-	if err != nil {
-		panic(err)
-	}
-
+func removeOldImages() {
 	tmp := make([]string, 0, len(cachedImages))
 	for key, val := range cachedImages {
 		tmp = append(tmp, strconv.FormatInt(val, 10)+":"+key)
@@ -135,22 +125,11 @@ func removeOldImages() error {
 	for i := 0; i < len(tmp)-IMAGE_CACHE_NUM; i++ {
 		spliited := strings.Split(tmp[i], ":")
 		key := spliited[1]
+
+		_, err := cli.ImageRemove(context.Background(), key, types.ImageRemoveOptions{Force: true})
+		if err != nil {
+			logger.Println(err.Error())
+		}
 		delete(cachedImages, key)
 	}
-
-	for _, image := range images {
-		imageName := strings.Split(image.RepoTags[0], ":")[0]
-		_, exists := cachedImages[imageName]
-
-		if len(imageName) > 5 && imageName[0:5] == "lalb_" && exists == false {
-			_, err := cli.ImageRemove(context.Background(), image.ID, types.ImageRemoveOptions{
-				Force: true,
-			})
-
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

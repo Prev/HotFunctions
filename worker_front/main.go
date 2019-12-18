@@ -1,24 +1,24 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
 
 var cli *client.Client
 var cachedImages map[string]int64
 var cachedImagesMutex *sync.Mutex
+var imageIsBuilding map[string]bool
+var imageIsBuildingMutex *sync.Mutex
 var logger *log.Logger
 
 const IMAGE_CACHE_NUM = 2
@@ -29,8 +29,13 @@ func makeTimestamp() int64 {
 }
 
 func main() {
+	runtime.GOMAXPROCS(4)
+
 	cachedImages = make(map[string]int64)
 	cachedImagesMutex = new(sync.Mutex)
+	imageIsBuilding = make(map[string]bool)
+	imageIsBuildingMutex = new(sync.Mutex)
+
 	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
 	var err error
@@ -94,62 +99,58 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		writeFailResponse(&w, "param 'name' is not given")
 		return
 	}
-
-	logger.Println("function requested:", nameParam[0])
-
 	startTime := makeTimestamp()
 
 	functionName := nameParam[0]
-	targetImageName := imageTagName(functionName)
+	imageName := imageTagName(functionName)
 
-	imageFound := false
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
-	if err != nil {
-		writeFailResponse(&w, err.Error())
-		return
+	logger.Println("function requested:", functionName)
+
+	cacheExists := false
+	cachedImagesMutex.Lock()
+	if _, exists := cachedImages[imageName]; exists == true {
+		cacheExists = true
 	}
+	cachedImagesMutex.Unlock()
 
-	for _, image := range images {
-		if len(image.RepoTags) > 0 {
-			splitted := strings.Split(image.RepoTags[0], ":")
+	// Build image if cache not exist
+	if cacheExists == false {
+		imageIsBuildingMutex.Lock()
+		if imageIsBuilding[imageName] == true {
+			// Wait until image is built
+			logger.Printf("Image '%s' not found. Wait for build compeletion...\n", imageName)
 
-			if len(splitted) > 0 && splitted[0] == targetImageName {
-				imageFound = true
-				break
+			for {
+				imageIsBuildingMutex.Unlock()
+				time.Sleep(time.Second / 20)
+				imageIsBuildingMutex.Lock()
+
+				if imageIsBuilding[imageName] == false {
+					break
+				}
 			}
+			imageIsBuildingMutex.Unlock()
+
+		} else {
+			// Build image
+			imageIsBuilding[imageName] = true
+			imageIsBuildingMutex.Unlock()
+
+			logger.Printf("Image '%s' not found. Image build start.\n", imageName)
+			if err := buildImage(functionName); err != nil {
+				writeFailResponse(&w, err.Error())
+				return
+			}
+
+			imageIsBuildingMutex.Lock()
+			imageIsBuilding[imageName] = false
+			imageIsBuildingMutex.Unlock()
+
+			logger.Printf("Image '%s' build fin.\n", imageName)
 		}
 	}
 
-	// Build image if image not exist
-	if imageFound == false {
-		// Target function is in building process by other connection.
-		// Wait until building finished
-	WAITING:
-		for cachedImages[targetImageName] == -1 {
-			time.Sleep(time.Second / 20)
-		}
-
-		cachedImagesMutex.Lock()
-		if cachedImages[targetImageName] == -1 {
-			cachedImagesMutex.Unlock()
-			goto WAITING
-		}
-
-		cachedImages[targetImageName] = -1
-		cachedImagesMutex.Unlock()
-
-		logger.Printf("Image '%s' not found. Start to build\n", targetImageName)
-		if err := buildImage(functionName); err != nil {
-			writeFailResponse(&w, err.Error())
-			return
-		}
-
-		cachedImagesMutex.Lock()
-		cachedImages[targetImageName] = 0
-		cachedImagesMutex.Unlock()
-	}
-
-	out, err := runContainer(targetImageName)
+	out, err := runContainer(imageName)
 	if err != nil {
 		writeFailResponse(&w, err.Error())
 		return
@@ -160,23 +161,19 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	resp := SuccessResponse{
 		out.Result,
-		imageFound,
+		cacheExists,
 		endTime - startTime,
 		out.EndTime - out.StartTime,
 	}
 	bytes, _ := json.Marshal(resp)
 	w.Write(bytes)
 
-	go handleCachedImages(targetImageName)
+	go updateCachedImages(imageName)
 }
 
-func handleCachedImages(imageName string) {
+func updateCachedImages(imageName string) {
 	cachedImagesMutex.Lock()
 	cachedImages[imageName] = time.Now().Unix()
-
-	if err := removeOldImages(); err != nil {
-		//println(err.Error())
-	}
-
+	removeOldImages()
 	cachedImagesMutex.Unlock()
 }
