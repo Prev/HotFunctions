@@ -21,7 +21,7 @@ var imageIsBuilding map[string]bool
 var imageIsBuildingMutex *sync.Mutex
 var logger *log.Logger
 
-const IMAGE_CACHE_NUM = 2
+const IMAGE_CACHE_NUM = 4
 const REQUEST_API_KEY = "CS530"
 
 func makeTimestamp() int64 {
@@ -36,7 +36,7 @@ func main() {
 	imageIsBuilding = make(map[string]bool)
 	imageIsBuildingMutex = new(sync.Mutex)
 
-	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
 
 	var err error
 	cli, err = client.NewClientWithOpts(client.WithVersion("1.40"))
@@ -113,6 +113,7 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	cachedImagesMutex.Unlock()
 
+BUILD_IMAGE:
 	// Build image if cache not exist
 	if cacheExists == false {
 		imageIsBuildingMutex.Lock()
@@ -152,8 +153,10 @@ func (h *FrontHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	out, err := runContainer(imageName)
 	if err != nil {
-		writeFailResponse(&w, err.Error())
-		return
+		// writeFailResponse(&w, err.Error())
+		logger.Println(err.Error(), "Retry...")
+		cacheExists = false
+		goto BUILD_IMAGE
 	}
 
 	endTime := makeTimestamp()
