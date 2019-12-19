@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,9 @@ type NodeConfigData struct {
 	Url         string `json:"url"`
 	MaxCapacity int    `json:"maxCapacity"`
 }
+
+var logger *log.Logger
+var mutex *sync.Mutex
 
 func main() {
 	nodes := initNodesFromConfig("nodes.config.json")
@@ -35,9 +39,11 @@ func main() {
 		panic(err)
 	}
 	defer outputFile.Close()
-	myLogger := log.New(outputFile, "", log.Ldate|log.Ltime)
+	logger = log.New(outputFile, "", log.Ldate|log.Ltime)
 
-	num := 0
+	// sched := newTableBasedScheduler()
+	sched := newAdaptiveScheduler(2)
+
 	i := 0
 	for tick := 0; tick <= 20000; {
 		if i >= len(rows) {
@@ -47,25 +53,37 @@ func main() {
 		startTime, _ := strconv.Atoi(row[1])
 
 		if tick >= startTime {
+			i += 1
 			name := row[0]
-			node, err := leastLoaded(&nodes)
+
+			if name != "W1" && name != "W2" && name != "W3" && name != "W4" && name != "W5" && name != "W6" && name != "W7" {
+				continue
+			}
+
+			// node, err := leastLoaded(&nodes)
+			node, err := sched.pick(&nodes, name)
 
 			if err != nil {
-				fmt.Printf("[fail running] %s: %s\n", name, err.Error())
-			} else if name == "W1" || name == "W2" || name == "W3" || name == "W4" || name == "W5" || name == "W6" || name == "W7" {
-				num += 1
-				go node.runFunction(name, myLogger)
+				// fmt.Printf("[fail running] %s: %s\n", name, err.Error())
+				continue
 			}
-			i += 1
+
+			go node.runFunction(name, func(n string, time int64) {
+				sched.appendExecutionResult(n, time)
+			})
 
 		} else {
 			tick += 10
 			time.Sleep(time.Second / 100)
 		}
+
+		if tick%1000 == 0 {
+			sched.printTables()
+			printCapacityTable(&nodes)
+		}
 	}
 
 	time.Sleep(time.Second * 20)
-	println(num)
 }
 
 func initNodesFromConfig(configFilePath string) []*Node {
@@ -84,4 +102,22 @@ func initNodesFromConfig(configFilePath string) []*Node {
 		nodes[i] = newNode(i, nc.Url, nc.MaxCapacity)
 	}
 	return nodes
+}
+
+func printCapacityTable(nodes *[]*Node) {
+	out := "--------capacity table--------\n" +
+		"|Node\t|Total\t|Spare\t|Run\t|\n"
+
+	for _, node := range *nodes {
+		runningFunctions := ""
+		for fname, num := range node.running {
+			for i := 0; i < num; i++ {
+				runningFunctions += fmt.Sprintf("%s, ", fname)
+			}
+		}
+
+		out += fmt.Sprintf("|%d\t|%d\t|%d\t|%s\t|\n", node.id, node.maxCapacity, node.capacity(), runningFunctions)
+	}
+	out += "--------------------------"
+	println(out)
 }

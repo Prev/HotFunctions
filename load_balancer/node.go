@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -14,7 +13,9 @@ type Node struct {
 	id          int
 	url         string
 	maxCapacity int
-	running     int64
+	// running     int64
+	running map[string]int
+	mutex   *sync.Mutex
 }
 
 func newNode(id int, url string, maxCapacity int) *Node {
@@ -22,9 +23,19 @@ func newNode(id int, url string, maxCapacity int) *Node {
 	n.id = id
 	n.url = url
 	n.maxCapacity = maxCapacity
-	n.running = 0
+	// n.running = 0
+	n.running = make(map[string]int)
+	n.mutex = new(sync.Mutex)
 
 	return n
+}
+
+func (node *Node) capacity() int {
+	running := 0
+	for _, val := range node.running {
+		running += val
+	}
+	return node.maxCapacity - running
 }
 
 type workerResponse struct {
@@ -38,11 +49,18 @@ type lambdaResponseResult struct {
 	Body       string `json:"body"`
 }
 
-func (node *Node) runFunction(functionName string, logger *log.Logger) {
+func (node *Node) runFunction(functionName string, onComplete func(string, int64)) {
 	fmt.Printf("[run] %s at %d\n", functionName, node.id)
 
 	startTime := time.Now().UnixNano()
-	atomic.AddInt64(&node.running, 1)
+	// atomic.AddInt64(&node.running, 1)
+
+	node.mutex.Lock()
+	if _, exists := node.running[functionName]; exists == false {
+		node.running[functionName] = 0
+	}
+	node.running[functionName] += 1
+	node.mutex.Unlock()
 
 	resp, err := http.Get(node.url + "?key=CS530&name=" + functionName)
 	if err != nil {
@@ -82,5 +100,13 @@ func (node *Node) runFunction(functionName string, logger *log.Logger) {
 	logger.Output(2, log)
 
 	// node.running--
-	atomic.AddInt64(&node.running, -1)
+	// atomic.AddInt64(&node.running, -1)
+	node.mutex.Lock()
+	node.running[functionName]--
+	if node.running[functionName] == 0 {
+		delete(node.running, functionName)
+	}
+	node.mutex.Unlock()
+
+	onComplete(functionName, duration)
 }
