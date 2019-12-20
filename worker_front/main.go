@@ -39,7 +39,7 @@ func main() {
 	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
 
 	var err error
-	cli, err = client.NewClientWithOpts(client.WithVersion("1.40"))
+	cli, err = client.NewClientWithOpts(client.WithVersion("1.39"))
 	if err != nil {
 		panic(err)
 	}
