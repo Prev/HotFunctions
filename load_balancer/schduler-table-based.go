@@ -4,15 +4,17 @@ import "fmt"
 
 type TableBasedScheduler struct {
 	lookupTable map[string][]int // function-nodes pair
+	nodes       *[]*Node
 }
 
-func newTableBasedScheduler() *TableBasedScheduler {
+func newTableBasedScheduler(nodes *[]*Node) *TableBasedScheduler {
 	s := TableBasedScheduler{}
 	s.lookupTable = make(map[string][]int)
+	s.nodes = nodes
 	return &s
 }
 
-func (s TableBasedScheduler) pick(nodes *[]*Node, functionName string) (*Node, error) {
+func (s TableBasedScheduler) pick(functionName string) (*Node, error) {
 	var selected *Node = nil
 	var err error
 
@@ -22,9 +24,9 @@ func (s TableBasedScheduler) pick(nodes *[]*Node, functionName string) (*Node, e
 	}
 
 	if exists == true {
-		candidates := make([]*Node, 0, len(*nodes))
+		candidates := make([]*Node, 0, len(*s.nodes))
 		for _, nodeId := range nodeIdList {
-			for _, node := range *nodes {
+			for _, node := range *s.nodes {
 				if node.id == nodeId {
 					candidates = append(candidates, node)
 					break
@@ -36,7 +38,7 @@ func (s TableBasedScheduler) pick(nodes *[]*Node, functionName string) (*Node, e
 	}
 
 	if selected == nil {
-		selected, err = maxCapacity(nodes)
+		selected, err = maxCapacity(s.nodes)
 		if err != nil {
 			return nil, err
 		}

@@ -13,13 +13,15 @@ type AdaptiveScheduler struct {
 	numExecutions     map[string]int64
 	CMin              int
 	mutex             *sync.Mutex
+	nodes             *[]*Node
 }
 
-func newAdaptiveScheduler(CMin int) *AdaptiveScheduler {
+func newAdaptiveScheduler(nodes *[]*Node, CMin int) *AdaptiveScheduler {
 	s := AdaptiveScheduler{}
 	s.assignedTable = make(map[string][]int)
 	s.sumExecutionTimes = make(map[string]int64)
 	s.numExecutions = make(map[string]int64)
+	s.nodes = nodes
 	s.CMin = CMin
 	s.mutex = new(sync.Mutex)
 	return &s
@@ -45,7 +47,7 @@ func (s AdaptiveScheduler) appendExecutionResult(functionName string, executionT
 	s.mutex.Unlock()
 }
 
-func (s AdaptiveScheduler) pick(nodes *[]*Node, functionName string) (*Node, error) {
+func (s AdaptiveScheduler) pick(functionName string) (*Node, error) {
 	var selected *Node = nil
 	var err error
 
@@ -58,9 +60,9 @@ func (s AdaptiveScheduler) pick(nodes *[]*Node, functionName string) (*Node, err
 	}
 
 	if exists == true {
-		candidates := make([]*Node, 0, len(*nodes))
+		candidates := make([]*Node, 0, len(*s.nodes))
 		for _, nodeId := range nodeIdList {
-			for _, node := range *nodes {
+			for _, node := range *s.nodes {
 				if node.id == nodeId {
 					candidates = append(candidates, node)
 					break
@@ -71,7 +73,7 @@ func (s AdaptiveScheduler) pick(nodes *[]*Node, functionName string) (*Node, err
 	}
 
 	if selected == nil {
-		selected, err = maxCapacity(nodes)
+		selected, err = maxCapacity(s.nodes)
 		if err != nil {
 			return nil, err
 		}

@@ -41,8 +41,10 @@ func main() {
 	defer outputFile.Close()
 	logger = log.New(outputFile, "", log.Ldate|log.Ltime)
 
-	// sched := newTableBasedScheduler()
-	sched := newAdaptiveScheduler(2)
+	// sched := newLeastLoadedScheduler(&nodes)
+	// sched := newTableBasedScheduler(&nodes)
+	// sched := newAdaptiveScheduler(&nodes, 2)
+	sched := newConsistentHashingScheduler(&nodes, 8)
 
 	i := 0
 	for tick := 0; tick <= 20000; {
@@ -60,8 +62,7 @@ func main() {
 				continue
 			}
 
-			// node, err := leastLoaded(&nodes)
-			node, err := sched.pick(&nodes, name)
+			node, err := sched.pick(name)
 
 			if err != nil {
 				// fmt.Printf("[fail running] %s: %s\n", name, err.Error())
@@ -69,7 +70,7 @@ func main() {
 			}
 
 			go node.runFunction(name, func(n string, time int64) {
-				sched.appendExecutionResult(n, time)
+				// sched.appendExecutionResult(n, time)
 			})
 
 		} else {
@@ -78,7 +79,7 @@ func main() {
 		}
 
 		if tick%1000 == 0 {
-			sched.printTables()
+			// sched.printTables()
 			printCapacityTable(&nodes)
 		}
 	}

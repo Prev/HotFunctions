@@ -2,11 +2,21 @@ package main
 
 import "errors"
 
-func leastLoaded(nodes *[]*Node) (*Node, error) {
+type LeastLoadedScheduler struct {
+	nodes *[]*Node
+}
+
+func newLeastLoadedScheduler(nodes *[]*Node) *LeastLoadedScheduler {
+	s := LeastLoadedScheduler{}
+	s.nodes = nodes
+	return &s
+}
+
+func (s LeastLoadedScheduler) pick(_ string) (*Node, error) {
 	selected := -1
 	minUsed := 999999
 
-	for i, node := range *nodes {
+	for i, node := range *s.nodes {
 		used := node.maxCapacity - node.capacity()
 		if used >= node.maxCapacity {
 			continue
@@ -21,7 +31,7 @@ func leastLoaded(nodes *[]*Node) (*Node, error) {
 		return nil, errors.New("no available node found")
 	}
 
-	return (*nodes)[selected], nil
+	return (*s.nodes)[selected], nil
 }
 
 func maxCapacity(nodes *[]*Node) (*Node, error) {
