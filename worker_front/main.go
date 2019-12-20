@@ -21,7 +21,7 @@ var imageIsBuilding map[string]bool
 var imageIsBuildingMutex *sync.Mutex
 var logger *log.Logger
 
-const IMAGE_CACHE_NUM = 4
+const IMAGE_CACHE_NUM = 8
 const REQUEST_API_KEY = "CS530"
 
 func makeTimestamp() int64 {
