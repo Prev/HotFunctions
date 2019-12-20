@@ -41,31 +41,31 @@ func main() {
 	defer outputFile.Close()
 	logger = log.New(outputFile, "", log.Ldate|log.Ltime)
 
-	// sched := newLeastLoadedScheduler(&nodes)
+	sched := newLeastLoadedScheduler(&nodes)
+	// sched := newConsistentHashingScheduler(&nodes, 8)
 	// sched := newTableBasedScheduler(&nodes)
 	// sched := newAdaptiveScheduler(&nodes, 2)
-	sched := newConsistentHashingScheduler(&nodes, 8)
 
+	stdTick := time.Now().UnixNano() / int64(time.Millisecond)
+
+	tick := 0
 	i := 0
-	for tick := 0; tick <= 20000; {
+	for tick <= 60000 {
 		if i >= len(rows) {
 			break
 		}
 		row := rows[i]
 		startTime, _ := strconv.Atoi(row[1])
 
+		tick = int((time.Now().UnixNano() / int64(time.Millisecond)) - stdTick)
+
 		if tick >= startTime {
 			i += 1
 			name := row[0]
-
-			if name != "W1" && name != "W2" && name != "W3" && name != "W4" && name != "W5" && name != "W6" && name != "W7" {
-				continue
-			}
-
 			node, err := sched.pick(name)
 
 			if err != nil {
-				// fmt.Printf("[fail running] %s: %s\n", name, err.Error())
+				fmt.Printf("[fail running] %s: %s\n", name, err.Error())
 				continue
 			}
 
@@ -74,13 +74,7 @@ func main() {
 			})
 
 		} else {
-			tick += 10
 			time.Sleep(time.Second / 100)
-		}
-
-		if tick%1000 == 0 {
-			// sched.printTables()
-			printCapacityTable(&nodes)
 		}
 	}
 
