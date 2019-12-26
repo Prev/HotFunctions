@@ -36,6 +36,9 @@ durations_per_functions = {}
 latencies_per_functions = {}
 warm_per_functions = {}
 
+warm_latencies = []
+cold_latencies = []
+
 for row in log:
 	if len(row) <= 1:
 		continue
@@ -66,8 +69,10 @@ for row in log:
 	if start_type == 'warm':
 		num_warm_starts += 1
 		warm_per_functions[function_name] += 1
+		warm_latencies.append(latency)
 	else:
 		num_cold_starts += 1
+		cold_latencies.append(latency)
 
 	durations_per_functions[function_name].append(duration)
 	latencies_per_functions[function_name].append(latency)
@@ -76,6 +81,7 @@ for row in log:
 
 # print('--------------- # of distinct functions ---------------')
 avg_num_df = []
+per_time = [0] * 26
 for node_index, data in enumerate(ret):
 	arr = [len(d.keys()) for d in data.values()]
 	# print('[Node %d] %s (avg. %.1f)' % (
@@ -83,7 +89,18 @@ for node_index, data in enumerate(ret):
 	# 	join2(arr),
 	# 	avg(arr)
 	# ))
+
+	for i, d in enumerate(arr):
+		if i > 50: continue
+		per_time[int(i / 2)] += d
 	avg_num_df.append(avg(arr))
+
+# for i, d in enumerate(per_time):
+# 	print('(%d, %.2f)' % (
+# 		i*2,
+# 		d / 8 / 2,
+# 	), end=' ')
+# print('')
 
 print('# of distinct functions for each node: %.1f (stddev.: %.1f)' % (
 	avg(avg_num_df),
@@ -94,6 +111,7 @@ print('# of distinct functions for each node: %.1f (stddev.: %.1f)' % (
 # print('-------------------- loads --------------------')
 avg_executions = []
 avg_capacities = []
+
 for node_index, data in enumerate(ret):
 	arr = [sum(d.values()) for d in data.values()]
 	# print('[Node %d] %s (avg. %.1f)' % (
@@ -104,10 +122,15 @@ for node_index, data in enumerate(ret):
 	avg_executions.append(avg(arr))
 	avg_capacities.append(8-avg(arr))
 
-print('executions per node/sec: %.1f (stddev.: %.1f)' % (
+print('executions per node/sec: %.2f (stddev.: %.2f)' % (
 	avg(avg_executions),
 	stdd(avg_executions),
 ))
+
+for i, d in enumerate(avg_executions):
+	print('%.2f & ' % d, end='')
+print('%.2f & %.2f' % (avg(avg_executions), stdd(avg_executions)))
+
 print('capacities per node/sec: %.1f (stddev.: %.1f)' % (
 	avg(avg_capacities),
 	stdd(avg_capacities),
@@ -133,3 +156,6 @@ print('avg exec time: %dms\navg latency: %dms' % (
 	avg(durations),
 	avg(latencies),
 ))
+
+print('avg. latency for warm starts: %d' % avg(warm_latencies))
+print('avg. latency for cold starts: %d' % avg(cold_latencies))
