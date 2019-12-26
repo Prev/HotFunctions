@@ -62,7 +62,7 @@ func (node *Node) runFunction(functionName string, onComplete func(string, int64
 	node.running[functionName] += 1
 	node.mutex.Unlock()
 
-	resp, err := http.Get(node.url + "?key=CS530&name=" + functionName)
+	resp, err := http.Get(node.url + "/execute?name=" + functionName)
 	if err != nil {
 		panic(err)
 	}

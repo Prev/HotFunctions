@@ -1,11 +1,9 @@
 [
 	{
-		"id": 0,
 		"url": "http://localhost:8222",
 		"maxCapacity": 8
 	},
 	{
-		"id": 1,
 		"url": "http://localhost:8222",
 		"maxCapacity": 8
 	}

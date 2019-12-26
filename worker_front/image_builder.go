@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/docker/docker/api/types"
 	"github.com/mholt/archiver"
 )
 
@@ -17,38 +21,85 @@ const sampleFunctionsBucket = "lalb-sample-functions"
 const downloadPathPrefix = "_downloads/"
 const envPathPrefix = "envs/"
 
-func buildImage(functionName string) error {
+type ImageBuilder struct {
+	isBuilding map[string]bool
+	mutex      *sync.Mutex
+}
+
+func newImageBuilder() *ImageBuilder {
+	b := new(ImageBuilder)
+	b.isBuilding = make(map[string]bool)
+	b.mutex = new(sync.Mutex)
+	return b
+}
+
+func (b *ImageBuilder) Build2(functionName string) error {
+	b.mutex.Lock()
+	if b.isBuilding[functionName] == true {
+		// Wait until image is built
+		logger.Printf("Image for function '%s' not found. Wait for build compeletion...\n", functionName)
+		for {
+			b.mutex.Unlock()
+			time.Sleep(time.Second / 20)
+			b.mutex.Lock()
+
+			if b.isBuilding[functionName] == false {
+				break
+			}
+		}
+		b.mutex.Unlock()
+
+	} else {
+		b.isBuilding[functionName] = true
+		b.mutex.Unlock()
+
+		logger.Printf("Image for function '%s' not found. Image build start.\n", functionName)
+		if err := b.Build(functionName); err != nil {
+			return err
+		}
+
+		b.mutex.Lock()
+		b.isBuilding[functionName] = false
+		b.mutex.Unlock()
+
+		logger.Printf("Image for function '%s' build fin.\n", functionName)
+	}
+
+	return nil
+}
+
+func (b *ImageBuilder) Build(functionName string) error {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
 	// Download files of the function
-	functionPath, err := downloadFile(sess, functionName)
+	functionPath, err := b.downloadFile(sess, functionName)
 	if err != nil {
 		return err
 	}
 
 	// Read config.json file
-	config, err := getConfigOfTheFunction(functionPath)
+	config, err := b.getConfigOfTheFunction(functionPath)
 	if err != nil {
 		return err
 	}
 
 	// Make tar file for docker
-	tarPath, err := makeTarFile(functionPath, config["environment"])
+	tarPath, err := b.makeTarFile(functionPath, config["environment"])
 	if err != nil {
 		return err
 	}
 
 	// Build docker image
-	if err := buildImageWithTar(functionName, tarPath); err != nil {
+	if err := b.buildImageWithTar(functionName, tarPath); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func downloadFile(sess *session.Session, functionName string) (string, error) {
+func (b *ImageBuilder) downloadFile(sess *session.Session, functionName string) (string, error) {
 	os.MkdirAll(downloadPathPrefix, 0700)
 	zipFilePath := downloadPathPrefix + functionName + ".zip"
 	destPath := downloadPathPrefix + functionName
@@ -83,7 +134,7 @@ func downloadFile(sess *session.Session, functionName string) (string, error) {
 	return destPath, nil
 }
 
-func getConfigOfTheFunction(functionPath string) (map[string]string, error) {
+func (b *ImageBuilder) getConfigOfTheFunction(functionPath string) (map[string]string, error) {
 	jsonFile, err := os.Open(functionPath + "/config.json")
 	if err != nil {
 		return nil, err
@@ -97,7 +148,7 @@ func getConfigOfTheFunction(functionPath string) (map[string]string, error) {
 	return result, nil
 }
 
-func makeTarFile(functionPath string, envType string) (string, error) {
+func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string, error) {
 	fileList := []string{}
 
 	envDir := envPathPrefix + envType
@@ -122,6 +173,33 @@ func makeTarFile(functionPath string, envType string) (string, error) {
 	}
 
 	return tarFilePath, nil
+}
+
+func (b *ImageBuilder) buildImageWithTar(functionName string, tarPath string) error {
+	dockerBuildContext, err := os.Open(tarPath)
+	defer dockerBuildContext.Close()
+
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(300)*time.Second)
+	defer cancel()
+
+	opt := types.ImageBuildOptions{
+		Dockerfile: "/Dockerfile",
+		Tags:       []string{imageTagName(functionName)},
+	}
+
+	out, err := cli.ImageBuild(ctx, dockerBuildContext, opt)
+
+	if err != nil {
+		return err
+	}
+	io.Copy(ioutil.Discard, out.Body)
+	out.Body.Close()
+
+	return nil
 }
 
 func copyFile(src, dst string) error {
