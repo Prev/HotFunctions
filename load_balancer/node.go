@@ -79,10 +79,6 @@ func (node *Node) runFunction(functionName string, onComplete func(string, int64
 		println(string(data))
 	}
 
-	if result.ExecutionTime == 0 {
-		println(string(data))
-	}
-
 	endTime := time.Now().UnixNano()
 	duration := (endTime - startTime) / int64(time.Millisecond)
 
