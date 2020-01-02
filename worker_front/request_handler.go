@@ -101,7 +101,7 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 
 BUILD_IMAGE:
 	if cacheExists == false {
-		h.imageBuilder.Build2(functionName)
+		h.imageBuilder.BuildSafe(functionName)
 	}
 
 	out, err := RunContainer(imageName)

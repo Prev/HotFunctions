@@ -5,21 +5,18 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/docker/docker/api/types"
 	"github.com/mholt/archiver"
 )
 
-const sampleFunctionsBucket = "lalb-sample-functions"
-const downloadPathPrefix = "_downloads/"
-const envPathPrefix = "envs/"
+const DOWNLOAD_PATH_PREFIX = "_downloads/"
+const ENV_PATH_PREFIX = "envs/"
 
 type ImageBuilder struct {
 	isBuilding map[string]bool
@@ -33,7 +30,7 @@ func newImageBuilder() *ImageBuilder {
 	return b
 }
 
-func (b *ImageBuilder) Build2(functionName string) error {
+func (b *ImageBuilder) BuildSafe(functionName string) error {
 	b.mutex.Lock()
 	if b.isBuilding[functionName] == true {
 		// Wait until image is built
@@ -74,7 +71,7 @@ func (b *ImageBuilder) Build(functionName string) error {
 	}))
 
 	// Download files of the function
-	functionPath, err := b.downloadFile(sess, functionName)
+	functionPath, err := b.downloadFiles(sess, functionName)
 	if err != nil {
 		return err
 	}
@@ -99,34 +96,38 @@ func (b *ImageBuilder) Build(functionName string) error {
 	return nil
 }
 
-func (b *ImageBuilder) downloadFile(sess *session.Session, functionName string) (string, error) {
-	os.MkdirAll(downloadPathPrefix, 0700)
-	zipFilePath := downloadPathPrefix + functionName + ".zip"
-	destPath := downloadPathPrefix + functionName
+func (b *ImageBuilder) downloadFiles(sess *session.Session, functionName string) (string, error) {
+	os.MkdirAll(DOWNLOAD_PATH_PREFIX, 0700)
+	zipFilePath := DOWNLOAD_PATH_PREFIX + functionName + ".zip"
+	destPath := DOWNLOAD_PATH_PREFIX + functionName
 
+	// Remove old files
 	os.RemoveAll(zipFilePath)
 	os.RemoveAll(destPath)
 
-	file, err := os.Create(zipFilePath)
-	defer file.Close()
+	// Download zip file
+	resp, err := http.Get(USER_FUNCTION_URL_PREFIX + functionName + ".zip")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
 
+	// Create the file
+	out, err := os.Create(zipFilePath)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return "", err
 	}
 
-	downloader := s3manager.NewDownloader(sess)
-	_, err = downloader.Download(file,
-		&s3.GetObjectInput{
-			Bucket: aws.String(sampleFunctionsBucket),
-			Key:    aws.String(functionName + ".zip"),
-		})
-
-	if err != nil {
-		return "", err
-	}
-
+	// Unzip file
 	z := archiver.Zip{}
-	if err := z.Unarchive(zipFilePath, downloadPathPrefix); err != nil {
+	if err := z.Unarchive(zipFilePath, DOWNLOAD_PATH_PREFIX); err != nil {
 		return "", err
 	}
 	os.RemoveAll(zipFilePath)
@@ -149,9 +150,11 @@ func (b *ImageBuilder) getConfigOfTheFunction(functionPath string) (map[string]s
 }
 
 func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string, error) {
+	tarFilePath := functionPath + ".tar"
 	fileList := []string{}
 
-	envDir := envPathPrefix + envType
+	// Add env files
+	envDir := ENV_PATH_PREFIX + envType
 	entries, err := ioutil.ReadDir(envDir)
 	if err != nil {
 		return "", err
@@ -160,13 +163,19 @@ func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string,
 		fileList = append(fileList, envDir+"/"+entry.Name())
 	}
 
-	entries, _ = ioutil.ReadDir(functionPath)
+	// Add downloaded files
+	entries, err = ioutil.ReadDir(functionPath)
+	if err != nil {
+		return "", err
+	}
 	for _, entry := range entries {
 		fileList = append(fileList, functionPath+"/"+entry.Name())
 	}
-	tarFilePath := functionPath + ".tar"
+
+	// Remove old
 	os.RemoveAll(tarFilePath)
 
+	// Make a tar file
 	t := archiver.Tar{}
 	if err := t.Archive(fileList, tarFilePath); err != nil {
 		return "", err
@@ -192,32 +201,13 @@ func (b *ImageBuilder) buildImageWithTar(functionName string, tarPath string) er
 	}
 
 	out, err := cli.ImageBuild(ctx, dockerBuildContext, opt)
-
 	if err != nil {
 		return err
 	}
+
+	// Wait until bulid finished
 	io.Copy(ioutil.Discard, out.Body)
 	out.Body.Close()
 
 	return nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return out.Close()
 }

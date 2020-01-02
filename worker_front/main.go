@@ -16,6 +16,7 @@ var cli *client.Client
 var logger *log.Logger
 
 var IMAGE_CACHE_NUM int
+var USER_FUNCTION_URL_PREFIX string
 
 func imageTagName(functionName string) string {
 	return "lalb_" + strings.ToLower(functionName)
@@ -30,9 +31,17 @@ func getEnvInt(key string, fallback int) int {
 	return fallback
 }
 
+func getEnvString(key string, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 func main() {
 	GOMAXPROCS := getEnvInt("GOMAXPROCS", 8)
 	IMAGE_CACHE_NUM = getEnvInt("IMAGE_CACHE_NUM", 4)
+	USER_FUNCTION_URL_PREFIX = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
 
 	runtime.GOMAXPROCS(GOMAXPROCS)
 
