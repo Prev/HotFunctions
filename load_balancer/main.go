@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/Prev/LALB/load_balancer/scheduler"
@@ -18,7 +17,6 @@ type NodeConfigData struct {
 }
 
 var logger *log.Logger
-var mutex *sync.Mutex
 
 func main() {
 	if len(os.Args) != 2 {

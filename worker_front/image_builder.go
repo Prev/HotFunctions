@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/docker/docker/api/types"
 	"github.com/mholt/archiver"
 )
@@ -66,12 +65,8 @@ func (b *ImageBuilder) BuildSafe(functionName string) error {
 }
 
 func (b *ImageBuilder) Build(functionName string) error {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
 	// Download files of the function
-	functionPath, err := b.downloadFiles(sess, functionName)
+	functionPath, err := b.downloadFiles(functionName)
 	if err != nil {
 		return err
 	}
@@ -96,7 +91,7 @@ func (b *ImageBuilder) Build(functionName string) error {
 	return nil
 }
 
-func (b *ImageBuilder) downloadFiles(sess *session.Session, functionName string) (string, error) {
+func (b *ImageBuilder) downloadFiles(functionName string) (string, error) {
 	os.MkdirAll(DOWNLOAD_PATH_PREFIX, 0700)
 	zipFilePath := DOWNLOAD_PATH_PREFIX + functionName + ".zip"
 	destPath := DOWNLOAD_PATH_PREFIX + functionName

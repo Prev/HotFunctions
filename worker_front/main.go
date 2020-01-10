@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/client"
+	"github.com/sevlyar/go-daemon"
 )
 
 var cli *client.Client
@@ -39,13 +40,8 @@ func getEnvString(key string, fallback string) string {
 }
 
 func main() {
-	GOMAXPROCS := getEnvInt("GOMAXPROCS", 8)
-	IMAGE_CACHE_NUM = getEnvInt("IMAGE_CACHE_NUM", 4)
-	USER_FUNCTION_URL_PREFIX = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
-
-	runtime.GOMAXPROCS(GOMAXPROCS)
-
 	var err error
+
 	port := 8222
 	if len(os.Args) >= 2 {
 		port, err = strconv.Atoi(os.Args[1])
@@ -54,6 +50,43 @@ func main() {
 		}
 	}
 
+	if len(os.Args) >= 3 && os.Args[2] == "-d" {
+		// Run as a daemon if second argument is "-d"
+		cntxt := &daemon.Context{
+			PidFileName: "daemon.pid",
+			PidFilePerm: 0644,
+			LogFileName: "daemon.log",
+			LogFilePerm: 0640,
+			WorkDir:     "./",
+			Umask:       027,
+		}
+
+		child, err := cntxt.Reborn()
+		if err != nil {
+			log.Fatal("Unable to run: ", err)
+		}
+		if child != nil {
+			// Parent
+			println("Start worker-front as a daemon")
+		} else {
+			// Child daemon
+			defer cntxt.Release()
+			runWorkerFront(port)
+		}
+
+	} else {
+		runWorkerFront(port)
+	}
+}
+
+func runWorkerFront(port int) {
+	var err error
+
+	GOMAXPROCS := getEnvInt("GOMAXPROCS", 8)
+	IMAGE_CACHE_NUM = getEnvInt("IMAGE_CACHE_NUM", 4)
+	USER_FUNCTION_URL_PREFIX = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
+
+	runtime.GOMAXPROCS(GOMAXPROCS)
 	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
 
 	cli, err = client.NewClientWithOpts(client.WithVersion("1.39"))

@@ -1,2 +1,4 @@
 _downloads/
 _functions/
+daemon.log
+daemon.pid
