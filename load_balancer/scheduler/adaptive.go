@@ -1,22 +1,25 @@
-package main
+package scheduler
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
 
-// Greedy scheduler performing reassingment
+// Greedy scheduler performing reassingnment
 
 type AdaptiveScheduler struct {
+	Scheduler
+	nodes             *[]*Node
+	runningTable      map[int]map[string]int
 	assignedTable     map[string][]int
 	sumExecutionTimes map[string]int64
 	numExecutions     map[string]int64
 	CMin              int
 	mutex             *sync.Mutex
-	nodes             *[]*Node
 }
 
-func newAdaptiveScheduler(nodes *[]*Node, CMin int) *AdaptiveScheduler {
+func NewAdaptiveScheduler(nodes *[]*Node, CMin int) *AdaptiveScheduler {
 	s := AdaptiveScheduler{}
 	s.assignedTable = make(map[string][]int)
 	s.sumExecutionTimes = make(map[string]int64)
@@ -24,6 +27,12 @@ func newAdaptiveScheduler(nodes *[]*Node, CMin int) *AdaptiveScheduler {
 	s.nodes = nodes
 	s.CMin = CMin
 	s.mutex = new(sync.Mutex)
+
+	s.runningTable = make(map[int]map[string]int)
+	for _, node := range *s.nodes {
+		s.runningTable[node.Id] = make(map[string]int)
+	}
+
 	return &s
 }
 
@@ -40,14 +49,20 @@ func (s AdaptiveScheduler) met(functionName string) int64 {
 	return s.sumExecutionTimes[functionName] / s.numExecutions[functionName]
 }
 
-func (s AdaptiveScheduler) appendExecutionResult(functionName string, executionTime int64) {
+func (s AdaptiveScheduler) Finished(node *Node, functionName string, executionTime int64) error {
 	s.mutex.Lock()
+	s.runningTable[node.Id][functionName]--
+	if s.runningTable[node.Id][functionName] == 0 {
+		delete(s.runningTable[node.Id], functionName)
+	}
+
 	s.sumExecutionTimes[functionName] += executionTime
 	s.numExecutions[functionName]++
 	s.mutex.Unlock()
+	return nil
 }
 
-func (s AdaptiveScheduler) pick(functionName string) (*Node, error) {
+func (s AdaptiveScheduler) Select(functionName string) (*Node, error) {
 	var selected *Node = nil
 	var err error
 
@@ -63,35 +78,67 @@ func (s AdaptiveScheduler) pick(functionName string) (*Node, error) {
 		candidates := make([]*Node, 0, len(*s.nodes))
 		for _, nodeId := range nodeIdList {
 			for _, node := range *s.nodes {
-				if node.id == nodeId {
+				if node.Id == nodeId {
 					candidates = append(candidates, node)
 					break
 				}
 			}
 		}
-		selected, _ = maxCapacity(&candidates)
+		selected, _ = s.maxCapacityNode(&candidates)
 	}
 
 	if selected == nil {
-		selected, err = maxCapacity(s.nodes)
+		selected, err = s.maxCapacityNode(s.nodes)
 		if err != nil {
 			return nil, err
 		}
 
 		// Register for future use
-		s.assignedTable[functionName] = append(s.assignedTable[functionName], selected.id)
+		s.assignedTable[functionName] = append(s.assignedTable[functionName], selected.Id)
 	}
 
+	if _, exists := s.runningTable[selected.Id][functionName]; exists == false {
+		s.runningTable[selected.Id][functionName] = 0
+	}
+	s.runningTable[selected.Id][functionName] += 1
+
 	s.performReassignment(selected)
+	return selected, nil
+}
+
+func (s AdaptiveScheduler) nodeCapacity(node *Node) int {
+	running := 0
+	for _, val := range s.runningTable[node.Id] {
+		running += val
+	}
+	return node.MaxCapacity - running
+}
+
+func (s AdaptiveScheduler) maxCapacityNode(candidates *[]*Node) (*Node, error) {
+	var selected *Node = nil
+	maxCapacity := 0
+
+	for _, node := range *candidates {
+		capacity := s.nodeCapacity(node)
+
+		if capacity <= 0 {
+			continue
+		}
+		if capacity > maxCapacity {
+			maxCapacity = capacity
+			selected = node
+		}
+	}
+
+	if selected == nil {
+		return nil, errors.New("no available node found")
+	}
 
 	return selected, nil
 }
 
 func (s AdaptiveScheduler) performReassignment(node *Node) {
-	node.mutex.Lock()
-	defer node.mutex.Unlock()
-
-	capacity := node.capacity()
+	capacity := s.nodeCapacity(node)
 	if capacity > s.CMin {
 		// does not violate the policy
 		return
@@ -100,7 +147,7 @@ func (s AdaptiveScheduler) performReassignment(node *Node) {
 	majorityFname := ""
 	majorityVal := 0
 
-	for fname, val := range node.running {
+	for fname, val := range s.runningTable[node.Id] {
 		if majorityVal < val {
 			majorityVal = val
 			majorityFname = fname
@@ -111,7 +158,7 @@ func (s AdaptiveScheduler) performReassignment(node *Node) {
 	shortestMet := 999999999
 	victimFunction := ""
 
-	for fname, _ := range node.running {
+	for fname, _ := range s.runningTable[node.Id] {
 		if fname == majorityFname {
 			// skip for the majority function in the node
 			continue
@@ -125,7 +172,7 @@ func (s AdaptiveScheduler) performReassignment(node *Node) {
 
 	if victimFunction != "" {
 		for i, nodeId := range s.assignedTable[victimFunction] {
-			if nodeId == node.id {
+			if nodeId == node.Id {
 				// delete node
 				s.assignedTable[victimFunction] = append(s.assignedTable[victimFunction][:i], s.assignedTable[victimFunction][i+1:]...)
 			}

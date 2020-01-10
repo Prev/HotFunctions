@@ -1,16 +1,14 @@
-package main
+package scheduler
 
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"sort"
 )
 
-const MAX_VIRTUAL_NODES = 1024
-
 type ConsistentHashingScheduler struct {
+	Scheduler
 	virtualNodes []vNode
 }
 
@@ -19,13 +17,13 @@ type vNode struct {
 	node    *Node
 }
 
-func newConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int) *ConsistentHashingScheduler {
+func NewConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int) *ConsistentHashingScheduler {
 	s := ConsistentHashingScheduler{}
 	s.virtualNodes = make([]vNode, len(*nodes)*numVirtualNodes)
 
 	for i, node := range *nodes {
 		for m := 0; m < numVirtualNodes; m++ {
-			key := fmt.Sprintf("%d-%d", node.id, m)
+			key := fmt.Sprintf("%d-%d", node.Id, m)
 			s.virtualNodes[i*numVirtualNodes+m] = vNode{s.hash(key), node}
 		}
 	}
@@ -41,7 +39,7 @@ func (s ConsistentHashingScheduler) hash(key string) int {
 	return int(binary.BigEndian.Uint32(b2)) % 1234567 // magic number
 }
 
-func (s ConsistentHashingScheduler) pick(key string) (*Node, error) {
+func (s ConsistentHashingScheduler) Select(key string) (*Node, error) {
 	hashkey := s.hash(key)
 	n := len(s.virtualNodes)
 
@@ -62,19 +60,26 @@ func (s ConsistentHashingScheduler) pick(key string) (*Node, error) {
 		right = 0
 	}
 
-	// Check for the capacity
-	i := right
-	last := (i - 1 + n) % n
-	for {
-		if s.virtualNodes[i].node.capacity() > 0 {
-			return s.virtualNodes[i].node, nil
-		}
-		if i == last {
-			// all ring elements are visited
-			break
-		}
-		i = (i + 1) % n
-	}
+	return s.virtualNodes[right].node, nil
 
-	return nil, errors.New("no available node found")
+	// Check for the capacity
+	// i := right
+	// last := (i - 1 + n) % n
+	// for {
+	// 	if s.virtualNodes[i].node.capacity() > 0 {
+	// 		return s.virtualNodes[i].node, nil
+	// 	}
+	// 	if i == last {
+	// 		// all ring elements are visited
+	// 		break
+	// 	}
+	// 	i = (i + 1) % n
+	// }
+
+	// return nil, errors.New("no available node found")
+}
+
+func (s ConsistentHashingScheduler) Finished(node *Node, _ string, _ int64) error {
+	// Do nothing
+	return nil
 }
