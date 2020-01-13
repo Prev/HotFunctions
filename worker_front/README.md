@@ -14,7 +14,7 @@ Task runner of woker nodes. Excutes docker container of the function requested b
 
 ### How to install
 
-```
+```bash
 go get -u github.com/docker/docker/
 go get -u github.com/mholt/archiver/
 go get -u github.com/pierrec/lz4/v3
@@ -23,19 +23,19 @@ go get -u github.com/sevlyar/go-daemon
 
 ### How to run
 
-```
+```bash
 go run *.go
 ```
 
 Run as a daemon (with `port=8222`):
 
-```
+```bash
 go run *.go 8222 -d
 ```
 
 Kill daemon :
 
-```
+```bash
 kill `cat daemon.pid`
 ```
 

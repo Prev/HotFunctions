@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// Greedy scheduler performing reassingnment
+// Greedy scheduler performing reassignment
 
 type AdaptiveScheduler struct {
 	Scheduler

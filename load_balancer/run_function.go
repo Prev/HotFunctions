@@ -2,10 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/Prev/LALB/load_balancer/scheduler"
 )
@@ -21,18 +19,17 @@ type FunctionExecutionResult struct {
 	Body       string `json:"body"`
 }
 
-func runFunction(node *scheduler.Node, functionName string, onComplete func(string, int64)) {
-	fmt.Printf("[run] %s at %d\n", functionName, node.Id)
-
-	startTime := time.Now().UnixNano()
+func runFunction(node *scheduler.Node, functionName string) (WorkerResponse, error) {
+	// Since worker node provide RESTful API to execute a function,
+	// Send Get request to it
 	resp, err := http.Get(node.Url + "/execute?name=" + functionName)
 	if err != nil {
-		panic(err)
+		return WorkerResponse{}, err
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		return WorkerResponse{}, err
 	}
 	resp.Body.Close()
 
@@ -42,21 +39,6 @@ func runFunction(node *scheduler.Node, functionName string, onComplete func(stri
 		println(string(data))
 	}
 
-	endTime := time.Now().UnixNano()
-	duration := (endTime - startTime) / int64(time.Millisecond)
-
-	startType := "cold"
-	if result.IsWarm {
-		startType = "warm"
-	}
-
-	latency := duration - result.InternalExecutionTime
-
-	fmt.Printf("[finished] %s in %dms, %s start, latency %dms - %d %d %s\n",
-		functionName, duration, startType, latency, result.ExecutionTime, result.InternalExecutionTime, result.Result.Body)
-
-	log := fmt.Sprintf("%d %s %s %d %d %d", node.Id, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
-	logger.Output(2, log)
-
-	onComplete(functionName, duration)
+	// Since this function will called as goroutine, send result by callback
+	return result, nil
 }

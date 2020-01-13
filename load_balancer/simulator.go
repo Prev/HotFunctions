@@ -46,7 +46,7 @@ func (s *Simulator) Start(action func(string, int)) {
 
 		if tick >= startTime {
 			i += 1
-			action(row[0], startTime)
+			go action(row[0], startTime)
 
 		} else {
 			time.Sleep(time.Second / 100)
