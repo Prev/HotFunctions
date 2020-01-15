@@ -11,16 +11,6 @@ Task runner of woker nodes. Excutes docker container of the function requested b
 	- Attach environment by function's demands (python3.7, NodeJS 12, Java 8)
 	- Build docker image with the function source code
 
-
-### How to install
-
-```bash
-go get -u github.com/docker/docker/
-go get -u github.com/mholt/archiver/
-go get -u github.com/pierrec/lz4/v3
-go get -u github.com/sevlyar/go-daemon
-```
-
 ### How to run
 
 ```bash
@@ -39,3 +29,17 @@ Kill daemon :
 kill `cat daemon.pid`
 ```
 
+### How to install
+
+```bash
+go build
+```
+
+or
+
+```bash
+go get github.com/docker/docker@master
+go get github.com/mholt/archiver
+go get github.com/pierrec/lz4@v3
+go get github.com/sevlyar/go-daemon
+```
