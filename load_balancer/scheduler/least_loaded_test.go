@@ -74,11 +74,11 @@ func Test_LeastLoaded_Finished(t *testing.T) {
 	n2, _ := sched.Select("B")
 	sched.Finished(n1, "A", 0)
 
-	if sched.capacityTable[n1.Id] != 8 {
+	if sched.connections[n1.Id] != 8 {
 		t.Fatal("Least loaded algorithm has an error")
 	}
 
-	if sched.capacityTable[n2.Id] != 7 {
+	if sched.connections[n2.Id] != 7 {
 		t.Fatal("Least loaded algorithm has an error")
 	}
 
@@ -87,7 +87,7 @@ func Test_LeastLoaded_Finished(t *testing.T) {
 	sched.Finished(n2, "B", 0)
 
 	for _, node := range nodeList {
-		if sched.capacityTable[node.Id] != 8 {
+		if sched.connections[node.Id] != 8 {
 			t.Fatal("Least loaded algorithm has an error")
 		}
 	}

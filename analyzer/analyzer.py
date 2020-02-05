@@ -22,7 +22,7 @@ def stdd(datalist):
 with open(sys.argv[1], 'r') as file:
 	log = file.readlines()
 
-NUM_NODES = 8
+NUM_NODES = 6
 
 ret = [{} for _ in range(0, NUM_NODES)]
 std_time = 999999999999
@@ -127,14 +127,16 @@ print('executions per node/sec: %.2f (stddev.: %.2f)' % (
 	stdd(avg_executions),
 ))
 
-for i, d in enumerate(avg_executions):
-	print('%.2f & ' % d, end='')
-print('%.2f & %.2f' % (avg(avg_executions), stdd(avg_executions)))
+# for i, d in enumerate(avg_executions):
+# 	print('%.2f & ' % d, end='')
+# print('%.2f & %.2f' % (avg(avg_executions), stdd(avg_executions)))
 
-print('capacities per node/sec: %.1f (stddev.: %.1f)' % (
-	avg(avg_capacities),
-	stdd(avg_capacities),
-))
+# print('capacities per node/sec: %.1f (stddev.: %.1f)' % (
+# 	avg(avg_capacities),
+# 	stdd(avg_capacities),
+# ))
+
+sys.exit(0)
 
 # print('-------------------- warm/cold --------------------')
 print('# of warm starts:', num_warm_starts)

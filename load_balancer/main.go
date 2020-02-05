@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"time"
 
@@ -20,12 +21,16 @@ var logger *log.Logger
 
 func main() {
 	if len(os.Args) != 2 {
-		println("Usage: go run *.go ll|ch|tb|ad")
+		println("Usage: go run *.go ll|ch|ours")
 		os.Exit(-1)
 	}
 
-	// Modify nodes.config.json to cofigure worker nodes
-	nodes := initNodesFromConfig("nodes.config.json")
+	// Modify nodes.config.json to configure worker nodes
+	//nodes := initNodesFromConfig("nodes.config.json")
+	nodes := make([]*scheduler.Node, 6)
+	for i := 0; i < 6; i++ {
+		nodes[i] = scheduler.NewNode(i, "", 6)
+	}
 
 	var sched scheduler.Scheduler
 	switch os.Args[1] {
@@ -37,29 +42,28 @@ func main() {
 
 	case "ch":
 		// Consistent Hashing Scheduler
-		// SchedulerpicksthenodebyConsistent Hashing algorithm where key is the function name
+		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
 		println("Using Consistent Hashing Scheduler")
 		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8)
 
-	case "tb":
-		// Proposing Scheduler 1
-		// Static scheduler with Lookup-table without re- assignment
-		println("Using Table-based Scheduler")
-		sched = scheduler.NewTableBasedScheduler(&nodes)
+	case "pasch":
+		// Consistent Hashing Scheduler
+		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
+		println("Using PASch Extended Scheduler")
+		sched = scheduler.NewPASchScheduler(&nodes)
 
-	case "ad":
-		// Proposing Scheduler 2
-		// Adaptive scheduler with lookup-table and reassignment
-		println("Using Adaptive Scheduler")
-		sched = scheduler.NewAdaptiveScheduler(&nodes, 2)
+	case "ours":
+		// Proposing Greedy Scheduler
+		println("Using Our Scheduler")
+		sched = scheduler.NewOurScheduler(&nodes, 2)
 	}
 
 	logger = initLogger()
 
-	// Events are predeterminded and described at data/events.csv
+	// Events are predetermined and described at data/events.csv
 	// Simulator run functions at specific time, using `time.Sleep` method.
 	// The callback function will be executed based on startTime of the `events.csv` file,
-	// and executed with goroutine, which means multiple functions can be run conccurently
+	// and executed with goroutine, which means multiple functions can be run concurrently
 	simulator := newSimulator("data/events.csv")
 	simulator.Start(func(functionName string, virtualTime int) {
 		// StartTime will be recorded before running function & running scheduling algorithm
@@ -75,13 +79,14 @@ func main() {
 
 		fmt.Printf("[run] %s at %d\n", functionName, node.Id)
 
+		/*
 		// Run a function in selected node
 		result, err := runFunction(node, functionName)
 		if err != nil {
 			panic(err)
 		}
 
-		// Caculate times from endTime and startTime
+		// Calculate times from endTime and startTime
 		endTime := time.Now().UnixNano()
 		duration := (endTime - startTime) / int64(time.Millisecond)
 
@@ -96,10 +101,21 @@ func main() {
 
 		// Print to stdout
 		fmt.Printf("[finished] %s in %dms, %s start, latency %dms - %s\n", functionName, duration, startType, latency, result.Result.Body)
+		*/
+
+		// 1~3 sec
+		rn := rand.Float64() * 2 + 1
+		time.Sleep(time.Second * time.Duration(rn))
+
+		endTime := time.Now().UnixNano()
+		duration := (endTime - startTime) / int64(time.Millisecond)
+		latency := 0
+		startType := "cold"
 
 		// Log result to the file
 		logMsg := fmt.Sprintf("%d %s %s %d %d %d", node.Id, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
 		logger.Output(2, logMsg)
+
 
 		// Notify scheduler that the function execution is completed
 		// Scheduler will modify its data structure (e.g. capacity-table) if it needs

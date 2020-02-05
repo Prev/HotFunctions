@@ -39,8 +39,8 @@ func (s ConsistentHashingScheduler) hash(key string) int {
 	return int(binary.BigEndian.Uint32(b2)) % 1234567 // magic number
 }
 
-func (s ConsistentHashingScheduler) Select(key string) (*Node, error) {
-	hashkey := s.hash(key)
+func (s ConsistentHashingScheduler) Select(functionName string) (*Node, error) {
+	hashkey := s.hash(functionName)
 	n := len(s.virtualNodes)
 
 	// Binary search
