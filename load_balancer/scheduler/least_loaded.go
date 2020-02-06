@@ -36,7 +36,7 @@ func (s LeastLoadedScheduler) Select(_ string) (*Node, error) {
 	return selected, nil
 }
 
-func (s LeastLoadedScheduler) Finished(node *Node, _ string, _ int64) error {
+func (s LeastLoadedScheduler) Finished(node *Node, _ string) error {
 	s.mutex.Lock()
 	node.Load--
 	s.mutex.Unlock()

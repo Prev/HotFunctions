@@ -3,13 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Prev/LALB/load_balancer/scheduler"
 	"io/ioutil"
 	"log"
-	"math/rand"
+	"net/http"
 	"os"
-	"time"
-
-	"github.com/Prev/LALB/load_balancer/scheduler"
 )
 
 type NodeConfigData struct {
@@ -18,31 +16,31 @@ type NodeConfigData struct {
 }
 
 var logger *log.Logger
+var sched scheduler.Scheduler
+var schedType string
 
 func main() {
 	if len(os.Args) != 2 {
-		println("Usage: go run *.go ll|ch|ours")
+		println("Usage: go run *.go ll|hash|ours|pasch")
 		os.Exit(-1)
 	}
+	schedType = os.Args[1]
 
 	// Modify nodes.config.json to configure worker nodes
-	//nodes := initNodesFromConfig("nodes.config.json")
-	nodes := make([]*scheduler.Node, 6)
-	for i := 0; i < 6; i++ {
-		nodes[i] = scheduler.NewNode(i, "", 6)
-	}
+	nodes := initNodesFromConfig("nodes.config.json")
+	//nodes := make([]*scheduler.Node, 6)
+	//for i := 0; i < 6; i++ {
+	//	nodes[i] = scheduler.NewNode(i, "")
+	//}
 
-	rand.Seed(time.Now().Unix())
-
-	var sched scheduler.Scheduler
-	switch os.Args[1] {
+	switch schedType {
 	case "ll":
 		// Least Loaded Scheduler
 		// Scheduler picks the node who has minimum executing tasks
 		println("Using Least Loaded Scheduler")
 		sched = scheduler.NewLeastLoadedScheduler(&nodes)
 
-	case "ch":
+	case "hash":
 		// Consistent Hashing Scheduler
 		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
 		println("Using Consistent Hashing Scheduler")
@@ -52,7 +50,7 @@ func main() {
 		// Consistent Hashing Scheduler
 		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
 		println("Using PASch Extended Scheduler")
-		sched = scheduler.NewPASchScheduler(&nodes)
+		sched = scheduler.NewPASchExtendedScheduler(&nodes, 8)
 
 	case "ours":
 		// Proposing Greedy Scheduler
@@ -60,13 +58,23 @@ func main() {
 		sched = scheduler.NewOurScheduler(&nodes, 8, 6, 3)
 	}
 
-	logger = initLogger()
+	port := 8111
 
+	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
+	logger.Printf("Server listening at :%d\n", port)
+
+	http.Handle("/", newRequestHandler())
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	/*
 	// Events are predetermined and described at data/events.csv
 	// Simulator run functions at specific time, using `time.Sleep` method.
 	// The callback function will be executed based on startTime of the `events.csv` file,
 	// and executed with goroutine, which means multiple functions can be run concurrently
-	simulator := newSimulator("data/events.csv")
+	simulator := simulator2.newSimulator("data/events.csv")
 	simulator.Start(func(functionName string, virtualTime int) {
 		// StartTime will be recorded before running function & running scheduling algorithm
 		startTime := time.Now().UnixNano()
@@ -80,30 +88,6 @@ func main() {
 		}
 
 		fmt.Printf("[run] %s at %d\n", functionName, node.Id)
-
-		/*
-		// Run a function in selected node
-		result, err := runFunction(node, functionName)
-		if err != nil {
-			panic(err)
-		}
-
-		// Calculate times from endTime and startTime
-		endTime := time.Now().UnixNano()
-		duration := (endTime - startTime) / int64(time.Millisecond)
-
-		// InternalExecutionTime is pure execution time of the user function
-		// Latency consists of Docker build time, container running time, scheduling algorithm execution time, network latency, etc.
-		latency := duration - result.InternalExecutionTime
-
-		startType := "cold"
-		if result.IsWarm {
-			startType = "warm"
-		}
-
-		// Print to stdout
-		fmt.Printf("[finished] %s in %dms, %s start, latency %dms - %s\n", functionName, duration, startType, latency, result.Result.Body)
-		*/
 
 		// 1~3 sec
 		rn := rand.Float64() * 2 + 1
@@ -125,6 +109,7 @@ func main() {
 	})
 
 	time.Sleep(time.Second * 20)
+	*/
 }
 
 // Init node list from the config file
@@ -141,20 +126,7 @@ func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 
 	nodes := make([]*scheduler.Node, len(nodeConfigs))
 	for i, nc := range nodeConfigs {
-		nodes[i] = scheduler.NewNode(i, nc.Url, nc.MaxCapacity)
+		nodes[i] = scheduler.NewNode(i, nc.Url)
 	}
 	return nodes
-}
-
-// Init logger
-func initLogger() *log.Logger {
-	dirName := "logs/" + time.Now().Format("2006-01-02")
-	os.MkdirAll(dirName, 0755)
-
-	logFileName := dirName + "/" + time.Now().Format("15:04:05") + ".log"
-	outputFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		panic(err)
-	}
-	return log.New(outputFile, "", log.Ldate|log.Ltime)
 }

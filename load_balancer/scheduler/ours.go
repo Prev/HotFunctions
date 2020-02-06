@@ -64,7 +64,7 @@ func (s OurScheduler) Select(functionName string) (*Node, error) {
 	return selected, nil
 }
 
-func (s OurScheduler) Finished(node *Node, functionName string, executionTime int64) error {
+func (s OurScheduler) Finished(node *Node, functionName string) error {
 	s.mutex.Lock()
 	s.running[node.Id][functionName]--
 	node.Load--

@@ -8,7 +8,7 @@ func Test_PASchExtended(t *testing.T) {
 		nodeList[i] = NewNode(i, "")
 	}
 
-	sched := NewPASchScheduler(&nodeList, 8)
+	sched := NewPASchExtendedScheduler(&nodeList, 8)
 
 	functionStream := []string{"A", "A", "A", "B", "C", "B", "B", "C"}
 	expectedNodes := []int{5, 3, 5, 0, 1, 0, 5, 1}

@@ -16,7 +16,7 @@ type PASchExtendedScheduler struct {
 	mutex         *sync.Mutex
 }
 
-func NewPASchScheduler(nodes *[]*Node, loadThreshold uint) *PASchExtendedScheduler {
+func NewPASchExtendedScheduler(nodes *[]*Node, loadThreshold uint) *PASchExtendedScheduler {
 	hashRing := consistent.New()
 	workerNodeMap := make(map[string]*Node)
 
@@ -60,7 +60,7 @@ func (s *PASchExtendedScheduler) Select(functionName string) (*Node, error) {
 	return selectedNode, nil
 }
 
-func (s *PASchExtendedScheduler) Finished(node *Node, _ string, _ int64) error {
+func (s *PASchExtendedScheduler) Finished(node *Node, _ string) error {
 	s.mutex.Lock()
 	node.Load--
 	s.mutex.Unlock()

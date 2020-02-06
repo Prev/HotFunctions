@@ -79,7 +79,7 @@ func (s ConsistentHashingScheduler) Select(functionName string) (*Node, error) {
 	// return nil, errors.New("no available node found")
 }
 
-func (s ConsistentHashingScheduler) Finished(node *Node, _ string, _ int64) error {
+func (s ConsistentHashingScheduler) Finished(node *Node, _ string) error {
 	// Do nothing
 	return nil
 }

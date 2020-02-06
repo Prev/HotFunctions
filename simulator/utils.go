@@ -3,23 +3,14 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"log"
 	"os"
 	"strconv"
 	"time"
 )
 
-type Simulator struct {
-	eventStreamPath string
-}
-
-func newSimulator(eventStreamPath string) *Simulator {
-	sim := new(Simulator)
-	sim.eventStreamPath = eventStreamPath
-	return sim
-}
-
-func (s *Simulator) Start(action func(string, int)) {
-	file, err := os.Open(s.eventStreamPath)
+func startSimulation(eventStreamPath string, action func(string, int)) {
+	file, err := os.Open(eventStreamPath)
 	if err != nil {
 		panic(err)
 	}
@@ -52,4 +43,16 @@ func (s *Simulator) Start(action func(string, int)) {
 			time.Sleep(time.Second / 100)
 		}
 	}
+}
+
+func initLogger() *log.Logger {
+	dirName := "logs/" + time.Now().Format("2006-01-02")
+	os.MkdirAll(dirName, 0755)
+
+	logFileName := dirName + "/" + time.Now().Format("15:04:05") + ".log"
+	outputFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		panic(err)
+	}
+	return log.New(outputFile, "", log.Ldate|log.Ltime)
 }
