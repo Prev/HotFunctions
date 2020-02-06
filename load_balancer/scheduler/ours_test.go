@@ -18,16 +18,16 @@ func Test_sliceTopN(t *testing.T) {
 	t.Log(ret[0], ret[1])
 }
 
-func Test_Adaptive(t *testing.T) {
+func Test_Ours(t *testing.T) {
 	nodeList := make([]*Node, 2)
 	for i := 0; i < 2; i++ {
-		nodeList[i] = NewNode(i, "", 6)
+		nodeList[i] = NewNode(i, "")
 	}
 
-	sched := NewOurScheduler(&nodeList, 2)
+	sched := NewOurScheduler(&nodeList, 4, 3, 1)
 
-	functionStream := []string{"A", "A", "A", "B", "C", "B", "B", "C"}
-	//expectedNodes := []int{0, 0, 0, 1, 1, 1, 1, 0}
+	functionStream := []string{"A", "A", "B", "C", "B", "C"}
+	expectedNodes := []int{0, 0, 1, 1, 1, 0}
 
 	for i, fn := range functionStream {
 		node, err := sched.Select(fn)
@@ -35,10 +35,10 @@ func Test_Adaptive(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		t.Log(i, fn, node.Id)
-		//if node.Id != expectedNodes[i] {
-		//	t.Fatal("Expected nodeId:", expectedNodes[i], ", real: ", node.Id)
-		//}
+		//t.Log(i, fn, node.Id)
+		if node.Id != expectedNodes[i] {
+			t.Fatal("Expected nodeId:", expectedNodes[i], ", real: ", node.Id)
+		}
 	}
 }
 

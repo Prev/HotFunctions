@@ -9,7 +9,6 @@ func Test_ConsistentHashing(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		nodeList[i] = new(Node)
 		nodeList[i].Id = i
-		nodeList[i].MaxCapacity = 4
 	}
 
 	sched := NewConsistentHashingScheduler(&nodeList, 4)

@@ -32,6 +32,8 @@ func main() {
 		nodes[i] = scheduler.NewNode(i, "", 6)
 	}
 
+	rand.Seed(time.Now().Unix())
+
 	var sched scheduler.Scheduler
 	switch os.Args[1] {
 	case "ll":
@@ -55,7 +57,7 @@ func main() {
 	case "ours":
 		// Proposing Greedy Scheduler
 		println("Using Our Scheduler")
-		sched = scheduler.NewOurScheduler(&nodes, 2)
+		sched = scheduler.NewOurScheduler(&nodes, 8, 6, 3)
 	}
 
 	logger = initLogger()

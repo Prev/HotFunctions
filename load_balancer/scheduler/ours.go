@@ -1,90 +1,130 @@
 package scheduler
 
 import (
-	"math/rand"
+	"errors"
+	"sort"
 	"sync"
-	"time"
 )
-
-// Greedy scheduler
 
 type OurScheduler struct {
 	Scheduler
-	nodes *[]*Node
-	T     map[string][]*Node
-	CMin  int
-	mutex *sync.Mutex
+	nodes    *[]*Node
+	assigned map[string][]*Node
+	running  map[int]map[string]int
+	T_MAX uint
+	T_OPT uint
+	CACHE_SIZE int
+	mutex    *sync.Mutex
 }
 
-func NewOurScheduler(nodes *[]*Node, CMin int) *OurScheduler {
+func NewOurScheduler(nodes *[]*Node, T_MAX uint, T_OPT uint, cacheSize int) *OurScheduler {
 	s := OurScheduler{}
-	s.T = make(map[string][]*Node)
 	s.nodes = nodes
-	s.CMin = CMin
+	s.T_MAX = T_MAX
+	s.T_OPT = T_OPT
+	s.CACHE_SIZE = cacheSize
+	s.assigned = make(map[string][]*Node)
 	s.mutex = new(sync.Mutex)
-	rand.Seed(time.Now().Unix())
+
+	s.running = make(map[int]map[string]int)
+	for _, node := range *s.nodes {
+		s.running[node.Id] = make(map[string]int)
+	}
 	return &s
+}
+
+func (s OurScheduler) Select(functionName string) (*Node, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var selected *Node = nil
+
+	candidateNodes, exists := s.assigned[functionName]
+	if exists == false {
+		s.assigned[functionName] = make([]*Node, 0)
+	}
+
+	if len(candidateNodes) > 0 {
+		selected = s.leastLoadedAmongAvailable(functionName, &candidateNodes)
+	}
+
+	if selected == nil {
+		if selected = s.leastLoadedAmongAvailable(functionName, s.nodes); selected == nil {
+			return nil, errors.New("no available node found")
+		}
+		// Register for future use
+		s.assigned[functionName] = append(s.assigned[functionName], selected)
+	}
+
+	if _, exists := s.running[selected.Id][functionName]; exists == false {
+		s.running[selected.Id][functionName] = 0
+	}
+	s.running[selected.Id][functionName] += 1
+	selected.Load++
+	return selected, nil
 }
 
 func (s OurScheduler) Finished(node *Node, functionName string, executionTime int64) error {
 	s.mutex.Lock()
-	node.running[functionName] -= 1
+	s.running[node.Id][functionName]--
+	node.Load--
 	s.mutex.Unlock()
 	return nil
 }
 
-func (s OurScheduler) Select(functionName string) (*Node, error) {
-	var selected *Node = nil
+func (s OurScheduler) available(node *Node, f string) bool {
+	if node.Load >= s.T_MAX {
+		// Task is overloaded
+		return false
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	} else if node.Load >= s.T_OPT {
+		// Work load is going full, only accept for the major applications
+		majorFunctions := sliceTopN(s.running[node.Id], s.CACHE_SIZE)
+		for _, fi := range majorFunctions {
+			if fi == f {
+				return true
+			}
+		}
+		return false
 
-	delegatedNodes, exists := s.T[functionName]
-	if exists == false {
-		s.T[functionName] = make([]*Node, 0)
+	} else {
+		return true
 	}
+}
 
-	if exists == true {
-		w1 := randSelect(delegatedNodes)
-		w2 := randSelect(delegatedNodes)
+func (s OurScheduler) leastLoadedAmongAvailable(functionName string, candidates *[]*Node) *Node {
+	var selected *Node = nil
+	for _, node := range *candidates {
+		if !s.available(node, functionName) {
+			continue
+		}
+		if selected == nil || node.Load < selected.Load {
+			selected = node
+		}
+	}
+	return selected
+}
 
-		available1, load1 := w1.preflight(functionName)
-		available2, load2 := w2.preflight(functionName)
+func sliceTopN(data map[string]int, n int) []string {
+	values := make([]int, 0)
+	for _, ni := range data {
+		values = append(values, ni)
+	}
+	sort.Slice(values, func(i, j int) bool {
+		return values[i] > values[j]
+	})
 
-		if available1 || available2 {
-			if load1 < load2 {
-				selected = w1
-			} else {
-				selected = w2
+	ret := make([]string, 0)
+	for i, ni := range values {
+		if i >= n {
+			break
+		}
+		for fj, nj := range data {
+			if ni == nj {
+				ret = append(ret, fj)
+				break
 			}
 		}
 	}
-
-	if selected == nil {
-		w1 := randSelect(*s.nodes)
-		w2 := randSelect(*s.nodes)
-
-		_, load1 := w1.preflight(functionName)
-		_, load2 := w2.preflight(functionName)
-
-		if load1 < load2 {
-			selected = w1
-		} else {
-			selected = w2
-		}
-
-		// Register for future use
-		s.T[functionName] = append(s.T[functionName], selected)
-	}
-
-	if _, exists := selected.running[functionName]; exists == false {
-		selected.running[functionName] = 0
-	}
-	selected.running[functionName] += 1
-	return selected, nil
-}
-
-func randSelect(nodeList []*Node) *Node {
-	i := rand.Int() % len(nodeList)
-	return nodeList[i]
+	return ret
 }

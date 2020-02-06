@@ -1,86 +1,78 @@
 package scheduler
 
 import (
-	"fmt"
-	"sort"
+	"strconv"
 	"sync"
+
+	"github.com/lafikl/consistent"
 )
 
-const LOAD_THREASHOLD = 8
-
 type PASchExtendedScheduler struct {
-	ConsistentHashingScheduler
-	connections map[int]int
-	mutex       *sync.Mutex
+	Scheduler
+	hashRing      *consistent.Consistent
+	loadThreshold uint
+	workerNodes   *[]*Node
+	workerNodeMap map[string]*Node
+	mutex         *sync.Mutex
 }
 
+func NewPASchScheduler(nodes *[]*Node, loadThreshold uint) *PASchExtendedScheduler {
+	hashRing := consistent.New()
+	workerNodeMap := make(map[string]*Node)
 
-func NewPASchScheduler(nodes *[]*Node) *PASchExtendedScheduler {
-	s := PASchExtendedScheduler{}
-
-	// For consistent hashing
-	numVirtualNodes := 8
-	s.virtualNodes = make([]vNode, len(*nodes)*numVirtualNodes)
-
-	for i, node := range *nodes {
-		for m := 0; m < numVirtualNodes; m++ {
-			key := fmt.Sprintf("%d-%d", node.Id, m)
-			s.virtualNodes[i*numVirtualNodes+m] = vNode{s.hash(key), node}
-		}
+	s := PASchExtendedScheduler{
+		nil,
+		hashRing,
+		loadThreshold,
+		nodes,
+		workerNodeMap,
+		new(sync.Mutex),
 	}
-	sort.SliceStable(s.virtualNodes, func(i, j int) bool {
-		return s.virtualNodes[i].hashkey < s.virtualNodes[j].hashkey
-	})
 
-	// For least loaded algorithm
-	s.connections = make(map[int]int)
 	for _, node := range *nodes {
-		s.connections[node.Id] = 0
+		key := strconv.Itoa(node.Id)
+		s.hashRing.Add(key)
+		s.workerNodeMap[key] = node
 	}
-	s.mutex = new(sync.Mutex)
 	return &s
 }
 
-func (s PASchExtendedScheduler) Select(functionName string) (*Node, error) {
+func (s *PASchExtendedScheduler) Select(functionName string) (*Node, error) {
+	key1, _ := s.hashRing.Get(functionName)
+	key2, _ := s.hashRing.Get(functionName + "salt")
+
+	node1 := s.workerNodeMap[key1]
+	node2 := s.workerNodeMap[key2]
+
+	selectedNode := node1
+	if node1.Load > node2.Load {
+		selectedNode = node2
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	a1, _ := s.ConsistentHashingScheduler.Select(functionName)
-	a2, _ := s.ConsistentHashingScheduler.Select(functionName + "salt")
-
-	load1 := s.connections[a1.Id]
-	load2 := s.connections[a2.Id]
-
-	var selected *Node = nil
-
-	if load1 < load2 {
-		selected = a1
-	} else {
-		selected = a2
+	if selectedNode.Load >= s.loadThreshold { // Find least loaded
+		selectedNode = s.selectLeastLoadedWorker()
 	}
 
-	if load1 > LOAD_THREASHOLD && load2 > LOAD_THREASHOLD {
-		minLoaded := 9999999
-		for _, vn := range s.virtualNodes {
-			loaded := s.connections[vn.node.Id]
-			if minLoaded > loaded {
-				minLoaded = loaded
-				selected = vn.node
-			}
-		}
-	}
-
-	if _, exists := s.connections[selected.Id]; exists == false {
-		s.connections[selected.Id] = 0
-	}
-	s.connections[selected.Id] += 1
-	return selected, nil
+	selectedNode.Load++
+	return selectedNode, nil
 }
 
-func (s PASchExtendedScheduler) Finished(node *Node, _ string, _ int64) error {
+func (s *PASchExtendedScheduler) Finished(node *Node, _ string, _ int64) error {
 	s.mutex.Lock()
-	s.connections[node.Id] -= 1
+	node.Load--
 	s.mutex.Unlock()
-
 	return nil
+}
+
+func (s *PASchExtendedScheduler) selectLeastLoadedWorker() *Node {
+	var selected *Node = nil
+	for _, node := range *s.workerNodes {
+		if selected == nil || node.Load < selected.Load {
+			selected = node
+		}
+	}
+	return selected
 }
