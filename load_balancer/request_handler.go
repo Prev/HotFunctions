@@ -21,6 +21,23 @@ type FailResponse struct {
 	Message string
 }
 
+type Response struct {
+	Result                FunctionExecutionResult
+	IsWarm                bool
+	ExecutionTime         int64
+	InternalExecutionTime int64
+	LoadBalancingInfo     LoadBalancingInfoType
+}
+type FunctionExecutionResult struct {
+	StatusCode int    `json:"statusCode"`
+	Body       string `json:"body"`
+}
+type LoadBalancingInfoType struct {
+	WorkerNodeId   int
+	WorkerNodeUrl  string
+	Algorithm      string
+}
+
 func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	logger.Println(req.Method, req.URL.String())
 	w.Header().Add("Content-Type", "application/json")
@@ -58,11 +75,22 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	bytes, _ := ioutil.ReadAll(resp.Body)
+	var ret Response
+	if err := json.Unmarshal(bytes, &ret); err != nil {
+		println(err.Error())
+		println(string(bytes))
+	}
+	ret.LoadBalancingInfo = LoadBalancingInfoType{
+		node.Id,
+		node.Url,
+		schedType,
+	}
+	bytes, _ = json.Marshal(ret)
+
 	(*w).Header().Set("X-Balancing-Algorithm", schedType)
 	(*w).Header().Set("X-Node-ID", strconv.Itoa(node.Id))
 	(*w).Header().Set("X-Node-URL", node.Url)
-
-	bytes, _ := ioutil.ReadAll(resp.Body)
 	(*w).Write(bytes)
 }
 

@@ -32,7 +32,7 @@ func main() {
 		startTime := time.Now().UnixNano()
 
 		// Request function call to load balancer
-		lbr, wr, err := runFunction(lbUrl, functionName)
+		resp, err := runFunction(lbUrl, functionName)
 		if err != nil {
 			panic(err)
 		}
@@ -43,18 +43,20 @@ func main() {
 
 		// InternalExecutionTime is pure execution time of the user function
 		// Latency consists of Docker build time, container running time, scheduling algorithm execution time, network latency, etc.
-		latency := duration - wr.InternalExecutionTime
+		latency := duration - resp.InternalExecutionTime
 
 		startType := "cold"
-		if wr.IsWarm {
+		if resp.IsWarm {
 			startType = "warm"
 		}
 
+		nodeId := resp.LoadBalancingInfo.WorkerNodeId
+
 		// Print to stdout
-		fmt.Printf("%s in %dms, at node %d, %s start, latency %dms - %s\n", functionName, lbr.NodeId, duration, startType, latency, wr.Result.Body)
+		fmt.Printf("%s in %dms, at node %d, %s start, latency %dms - %s\n", functionName, duration, nodeId, startType, latency, resp.Result.Body)
 
 		// Log result to the file
-		logMsg := fmt.Sprintf("%d %s %s %d %d %d", lbr.NodeId, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
+		logMsg := fmt.Sprintf("%d %s %s %d %d %d", nodeId, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
 		logger.Output(2, logMsg)
 	})
 

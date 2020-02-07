@@ -26,12 +26,7 @@ func main() {
 	}
 	schedType = os.Args[1]
 
-	// Modify nodes.config.json to configure worker nodes
 	nodes := initNodesFromConfig("nodes.config.json")
-	//nodes := make([]*scheduler.Node, 6)
-	//for i := 0; i < 6; i++ {
-	//	nodes[i] = scheduler.NewNode(i, "")
-	//}
 
 	switch schedType {
 	case "ll":
@@ -68,48 +63,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	/*
-	// Events are predetermined and described at data/events.csv
-	// Simulator run functions at specific time, using `time.Sleep` method.
-	// The callback function will be executed based on startTime of the `events.csv` file,
-	// and executed with goroutine, which means multiple functions can be run concurrently
-	simulator := simulator2.newSimulator("data/events.csv")
-	simulator.Start(func(functionName string, virtualTime int) {
-		// StartTime will be recorded before running function & running scheduling algorithm
-		startTime := time.Now().UnixNano()
-
-		// Select proper worker node by scheduler
-		node, err := sched.Select(functionName)
-
-		if err != nil {
-			fmt.Printf("[fail running] %s: %s\n", functionName, err.Error())
-			return
-		}
-
-		fmt.Printf("[run] %s at %d\n", functionName, node.Id)
-
-		// 1~3 sec
-		rn := rand.Float64() * 2 + 1
-		time.Sleep(time.Second * time.Duration(rn))
-
-		endTime := time.Now().UnixNano()
-		duration := (endTime - startTime) / int64(time.Millisecond)
-		latency := 0
-		startType := "cold"
-
-		// Log result to the file
-		logMsg := fmt.Sprintf("%d %s %s %d %d %d", node.Id, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
-		logger.Output(2, logMsg)
-
-
-		// Notify scheduler that the function execution is completed
-		// Scheduler will modify its data structure (e.g. capacity-table) if it needs
-		sched.Finished(node, functionName, duration)
-	})
-
-	time.Sleep(time.Second * 20)
-	*/
 }
 
 // Init node list from the config file
