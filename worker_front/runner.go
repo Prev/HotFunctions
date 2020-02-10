@@ -12,7 +12,7 @@ type FunctionRunner struct {
 	cachingOptions       CachingOptions
 	lru                  map[string]int64
 	imageExists          map[string]bool
-	prewarmedContainers  []string
+	poolManager          *ContainerPoolManager
 	imageBuilder         *ImageBuilder
 	mutex                *sync.Mutex
 }
@@ -28,6 +28,7 @@ func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
 	r.lru = make(map[string]int64)
 	r.imageExists = make(map[string]bool)
 	r.imageBuilder = newImageBuilder()
+	r.poolManager = NewContainerPoolManager(4)
 	r.mutex = new(sync.Mutex)
 	return r
 }
@@ -51,21 +52,11 @@ BuildImage:
 		}
 	}
 
-	// Step2: Check for the container existence.
-	targetContainerName := ""
-	r.mutex.Lock()
-	for i, containerName := range r.prewarmedContainers {
-		if containerBelongsToFunction(containerName, functionName) {
-			// Pick the proper idle container and remove it from the list
-			targetContainerName = containerName
-			r.prewarmedContainers = append(r.prewarmedContainers[:i], r.prewarmedContainers[i+1:]...)
-			break
-		}
-	}
-	r.mutex.Unlock()
+	// Step2: Check for the container pool.
+	targetContainerName, _ := r.poolManager.Pop(functionName)
 
 	if targetContainerName == "" {
-		// If there is no available container, create a new one
+		// No container
 		meta.ContainerCreated = true
 		if targetContainerName, err = CreateContainer(functionName); err != nil {
 			logger.Println(err.Error())
@@ -103,33 +94,12 @@ func (r *FunctionRunner) manageCaches() {
 		}
 		delete(r.imageExists, functionName)
 
-		// Remove pre-warm containers
-		for i := len(r.prewarmedContainers)-1; i >= 0; i-- {
-			containerName := r.prewarmedContainers[i]
-			if containerBelongsToFunction(containerName, functionName) {
-				r.prewarmedContainers = append(r.prewarmedContainers[:i], r.prewarmedContainers[i+1:]...)
-				cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{})
-			}
-		}
+		r.poolManager.Clear(functionName)
 	}
 
 	for _, functionName := range live {
 		r.imageExists[functionName] = true
-
-		// Make pool
-		prewarmedContainerNum := 0
-		for _, containerName := range r.prewarmedContainers {
-			if containerBelongsToFunction(containerName, functionName) {
-				prewarmedContainerNum++
-			}
-		}
-
-		// TODO
-		poolSize := 4
-		for i := 0; i < poolSize - prewarmedContainerNum; i++ {
-			containerName, _ := CreateContainer(functionName)
-			r.prewarmedContainers = append(r.prewarmedContainers, containerName)
-		}
+		r.poolManager.MakePool(functionName)
 	}
 }
 
