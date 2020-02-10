@@ -2,41 +2,22 @@ package main // import "github.com/Prev/LALB/worker_front"
 
 import (
 	"fmt"
+	"github.com/docker/docker/client"
+	"github.com/sevlyar/go-daemon"
 	"log"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
-
-	"github.com/docker/docker/client"
-	"github.com/sevlyar/go-daemon"
 )
 
 var cli *client.Client
 var logger *log.Logger
 
-var IMAGE_CACHE_NUM int
-var USER_FUNCTION_URL_PREFIX string
+var UserFunctionUrlPrefix string
 
-func imageTagName(functionName string) string {
-	return "lalb_" + strings.ToLower(functionName)
-}
-
-func getEnvInt(key string, fallback int) int {
-	if value, ok := os.LookupEnv(key); ok {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
-		}
-	}
-	return fallback
-}
-
-func getEnvString(key string, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
+type CachingOptions struct {
+	imageCacheMaxNumber int
 }
 
 func main() {
@@ -82,22 +63,24 @@ func main() {
 func runWorkerFront(port int) {
 	var err error
 
-	GOMAXPROCS := getEnvInt("GOMAXPROCS", 8)
-	IMAGE_CACHE_NUM = getEnvInt("IMAGE_CACHE_NUM", 4)
-	USER_FUNCTION_URL_PREFIX = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
+	goMaxProcs := getEnvInt("GOMAXPROCS", 8)
+	imageCacheNum := getEnvInt("IMAGE_CACHE_NUM", 4)
+	UserFunctionUrlPrefix = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
 
-	runtime.GOMAXPROCS(GOMAXPROCS)
+	runtime.GOMAXPROCS(goMaxProcs)
+
 	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
 
-	cli, err = client.NewClientWithOpts(client.WithVersion("1.39"))
-	if err != nil {
+	if cli, err = client.NewClientWithOpts(client.WithVersion("1.39")); err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("GOMAXPROCS: %d, IMAGE_CACHE_NUM: %d\n", GOMAXPROCS, IMAGE_CACHE_NUM)
+	logger.Printf("GOMAXPROCS: %d, IMAGE_CACHE_NUM: %d\n", goMaxProcs, imageCacheNum)
 	logger.Printf("Server listening at :%d\n", port)
 
-	http.Handle("/", newRequestHandler())
+	http.Handle("/", newRequestHandler(CachingOptions{
+		imageCacheNum,
+	}))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,8 +15,12 @@ import (
 	"github.com/mholt/archiver"
 )
 
-const DOWNLOAD_PATH_PREFIX = "_downloads/"
-const ENV_PATH_PREFIX = "envs/"
+const DownloadPathPrefix = "_downloads/"
+const EnvPathPrefix = "envs/"
+
+func imageTagName(functionName string) string {
+	return "lalb_" + strings.ToLower(functionName)
+}
 
 type ImageBuilder struct {
 	isBuilding map[string]bool
@@ -92,16 +97,16 @@ func (b *ImageBuilder) Build(functionName string) error {
 }
 
 func (b *ImageBuilder) downloadFiles(functionName string) (string, error) {
-	os.MkdirAll(DOWNLOAD_PATH_PREFIX, 0700)
-	zipFilePath := DOWNLOAD_PATH_PREFIX + functionName + ".zip"
-	destPath := DOWNLOAD_PATH_PREFIX + functionName
+	os.MkdirAll(DownloadPathPrefix, 0700)
+	zipFilePath := DownloadPathPrefix + functionName + ".zip"
+	destPath := DownloadPathPrefix + functionName
 
 	// Remove old files
 	os.RemoveAll(zipFilePath)
 	os.RemoveAll(destPath)
 
 	// Download zip file
-	resp, err := http.Get(USER_FUNCTION_URL_PREFIX + functionName + ".zip")
+	resp, err := http.Get(UserFunctionUrlPrefix + functionName + ".zip")
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +127,7 @@ func (b *ImageBuilder) downloadFiles(functionName string) (string, error) {
 
 	// Unzip file
 	z := archiver.Zip{}
-	if err := z.Unarchive(zipFilePath, DOWNLOAD_PATH_PREFIX); err != nil {
+	if err := z.Unarchive(zipFilePath, DownloadPathPrefix); err != nil {
 		return "", err
 	}
 	os.RemoveAll(zipFilePath)
@@ -149,7 +154,7 @@ func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string,
 	fileList := []string{}
 
 	// Add env files
-	envDir := ENV_PATH_PREFIX + envType
+	envDir := EnvPathPrefix + envType
 	entries, err := ioutil.ReadDir(envDir)
 	if err != nil {
 		return "", err

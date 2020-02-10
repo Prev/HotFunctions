@@ -1,30 +1,21 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
-
-	"github.com/docker/docker/api/types"
 )
 
+// RequestHandler of the worker front
 type RequestHandler struct {
 	http.Handler
-	cachedImages      map[string]int64
-	cachedImagesMutex *sync.Mutex
-	imageBuilder      *ImageBuilder
+	functionRunner *FunctionRunner
 }
 
-func newRequestHandler() *RequestHandler {
+func newRequestHandler(options CachingOptions) *RequestHandler {
 	h := new(RequestHandler)
-	h.cachedImages = make(map[string]int64)
-	h.cachedImagesMutex = new(sync.Mutex)
-	h.imageBuilder = newImageBuilder()
+	h.functionRunner = newFunctionRunner(options)
 	return h
 }
 
@@ -40,9 +31,9 @@ type ConfigureSuccessResponse struct {
 
 type ExecSuccessResponse struct {
 	Result                FunctionResponseResult
-	IsWarm                bool
 	ExecutionTime         int64
 	InternalExecutionTime int64
+	Meta                  runningMetaData
 }
 
 func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -50,10 +41,10 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	switch req.URL.Path {
-	case "/execute":
-		h.ExecFunction(&w, req)
 	case "/configure":
 		h.ConfigureWorker(&w, req)
+	case "/execute":
+		h.ExecFunction(&w, req)
 	default:
 		w.WriteHeader(404)
 		writeFailResponse(&w, "404 Not found on given path")
@@ -70,7 +61,7 @@ func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Reque
 	}
 
 	cacheNum, _ := strconv.Atoi(cacheNumParam[0])
-	IMAGE_CACHE_NUM = cacheNum
+	h.functionRunner.cachingOptions.imageCacheMaxNumber = cacheNum
 
 	resp := ConfigureSuccessResponse{"success", "configure changed successfully"}
 	bytes, _ := json.Marshal(resp)
@@ -88,67 +79,19 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	startTime := makeTimestamp()
 
 	functionName := nameParam[0]
-	imageName := imageTagName(functionName)
-
-	// logger.Println("function requested:", functionName)
-
-	cacheExists := false
-	h.cachedImagesMutex.Lock()
-	if _, exists := h.cachedImages[imageName]; exists == true {
-		cacheExists = true
-	}
-	h.cachedImagesMutex.Unlock()
-
-BUILD_IMAGE:
-	if cacheExists == false {
-		h.imageBuilder.BuildSafe(functionName)
-	}
-
-	out, err := RunContainer(imageName)
-	if err != nil {
-		logger.Println(err.Error(), "Retry...")
-		cacheExists = false
-		goto BUILD_IMAGE
-	}
+	out, meta := h.functionRunner.runFunction(functionName)
 
 	endTime := makeTimestamp()
 	logger.Println("fin", functionName)
 
 	resp := ExecSuccessResponse{
 		out.Result,
-		cacheExists,
 		endTime - startTime,
 		out.EndTime - out.StartTime,
+		meta,
 	}
 	bytes, _ := json.Marshal(resp)
 	(*w).Write(bytes)
-
-	go h.updateCachedImages(imageName)
-}
-
-func (h *RequestHandler) updateCachedImages(imageName string) {
-	h.cachedImagesMutex.Lock()
-	h.cachedImages[imageName] = time.Now().Unix()
-
-	// Remove old images
-	tmp := make([]string, 0, len(h.cachedImages))
-	for key, val := range h.cachedImages {
-		tmp = append(tmp, strconv.FormatInt(val, 10)+":"+key)
-	}
-	sort.Strings(tmp)
-
-	for i := 0; i < len(tmp)-IMAGE_CACHE_NUM; i++ {
-		spliited := strings.Split(tmp[i], ":")
-		key := spliited[1]
-
-		_, err := cli.ImageRemove(context.Background(), key, types.ImageRemoveOptions{Force: true})
-		if err != nil {
-			logger.Println(err.Error())
-		}
-		delete(h.cachedImages, key)
-	}
-
-	h.cachedImagesMutex.Unlock()
 }
 
 func writeFailResponse(w *http.ResponseWriter, message string) {

@@ -11,35 +11,45 @@ Task runner of woker nodes. Excutes docker container of the function requested b
 	- Attach environment by function's demands (python3.7, NodeJS 12, Java 8)
 	- Build docker image with the function source code
 
-### How to run
-
-```bash
-go run *.go
-```
-
-Run as a daemon (with `port=8222`):
-
-```bash
-go run *.go 8222 -d
-```
-
-Kill daemon :
-
-```bash
-kill `cat daemon.pid`
-```
 
 ### How to install
+
+Please use golang >= 1.13 since we use `gomod` for dependency control.  
+After update, run command below:
 
 ```bash
 go build
 ```
 
-or
+Or if you are not able to use `gomod`, get 3rd party libraries manually.
 
 ```bash
-go get github.com/docker/docker@master
-go get github.com/mholt/archiver
-go get github.com/pierrec/lz4@v3
-go get github.com/sevlyar/go-daemon
+go get -u github.com/docker/docker@master
+go get -u github.com/mholt/archiver
+go get -u github.com/pierrec/lz4@v3
+go get -u github.com/sevlyar/go-daemon
 ```
+
+
+### How to run
+
+We support two arguments for worker front.
+First argument is the port, and second argument is the option for daemon. 
+Default port number is `8222`.
+
+```bash
+$ go run *.go
+$ go run *.go 8222
+$ go run *.go 8222 -d
+```
+
+If you use daemonize option,
+then you can see two files (`daemon.log`, `daemon.pid`) on the same directory.
+To kill the daemon, run command like below.
+
+```bash
+kill `cat daemon.pid`
+```
+
+After running the worker front, you can access the worker front with visiting `http://localhost:8222`.
+To run the function `W1`, request `http://localhost:8222/execute?name=W1`.

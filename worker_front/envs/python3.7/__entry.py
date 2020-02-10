@@ -17,5 +17,5 @@ if __name__ == '__main__':
 		'result': result,
 	}
 
-	dummped_data = json.dumps(out)
-	print('-----%d-----=%s' % (len(dummped_data), dummped_data))
+	dump_data = json.dumps(out)
+	print('-=-=-=-=-=%d-=-=-=-=-=>%s==--==--==--==--==' % (len(dump_data), dump_data))
