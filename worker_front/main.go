@@ -17,7 +17,9 @@ var logger *log.Logger
 var UserFunctionUrlPrefix string
 
 type CachingOptions struct {
-	imageCacheMaxNumber int
+	ImageLimit         int
+	ContainerPoolLimit int
+	ContainerPoolNum   int
 }
 
 func main() {
@@ -63,9 +65,12 @@ func main() {
 func runWorkerFront(port int) {
 	var err error
 
-	goMaxProcs := getEnvInt("GOMAXPROCS", 8)
-	imageCacheNum := getEnvInt("IMAGE_CACHE_NUM", 4)
 	UserFunctionUrlPrefix = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
+	goMaxProcs := getEnvInt("GOMAXPROCS", 8)
+
+	imageCacheLimit := getEnvInt("IMAGE_CACHE_LIMIT", -1)
+	containerPoolLimit := getEnvInt("CONTAINER_POOL_LIMIT", -1)
+	containerPoolNum := getEnvInt("CONTAINER_POOL_NUM", 4)
 
 	runtime.GOMAXPROCS(goMaxProcs)
 
@@ -75,11 +80,13 @@ func runWorkerFront(port int) {
 		panic(err)
 	}
 
-	logger.Printf("GOMAXPROCS: %d, IMAGE_CACHE_NUM: %d\n", goMaxProcs, imageCacheNum)
+	logger.Printf("GOMAXPROCS: %d\n", goMaxProcs)
 	logger.Printf("Server listening at :%d\n", port)
 
 	http.Handle("/", newRequestHandler(CachingOptions{
-		imageCacheNum,
+		imageCacheLimit,
+		containerPoolLimit,
+		containerPoolNum,
 	}))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 

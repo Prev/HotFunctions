@@ -6,39 +6,27 @@ import (
 	"strconv"
 )
 
-type lruPair struct {
+type pair struct {
 	value int64
 	key string
 }
 
-func leastRecentlyUsed(lru *map[string]int64, n int) ([]string, []string) {
-	numTotalItems := len(*lru)
-	if numTotalItems < n {
-		n = numTotalItems
+func sortMapByValue(mapObject *map[string]int64) []string {
+	n := len(*mapObject)
+	tmp := make([]pair, 0, n)
+
+	for key, val := range *mapObject {
+		tmp = append(tmp, pair{val, key})
 	}
-
-	tmp := make([]lruPair, 0, numTotalItems)
-
-	for key, val := range *lru {
-		tmp = append(tmp, lruPair{val, key})
-	}
-
 	sort.Slice(tmp, func (i, j int) bool {
 		return tmp[i].value > tmp[j].value
 	})
 
-	live := make([]string, 0, n)
-	dead := make([]string, 0, numTotalItems - n)
-
+	ret := make([]string, n)
 	for i, item := range tmp {
-		if i < n {
-			live = append(live, item.key)
-		} else {
-			dead = append(dead, item.key)
-		}
+		ret[i] = item.key
 	}
-
-	return live, dead
+	return ret
 }
 
 

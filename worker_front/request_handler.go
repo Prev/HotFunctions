@@ -25,8 +25,8 @@ type FailResponse struct {
 }
 
 type ConfigureSuccessResponse struct {
-	Result  string
 	Message string
+	State   CachingOptions
 }
 
 type ExecSuccessResponse struct {
@@ -53,17 +53,30 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
-	cacheNumParam := q["cache_num"]
+	message := "nothing changed"
 
-	if len(cacheNumParam) == 0 {
-		writeFailResponse(w, "param 'cache_num' is not given")
-		return
+	imageLimit := q["image_limit"]
+	if len(imageLimit) > 0 {
+		val, _ := strconv.Atoi(imageLimit[0])
+		h.functionRunner.cachingOptions.ImageLimit = val
+		message = "configure changed"
 	}
 
-	cacheNum, _ := strconv.Atoi(cacheNumParam[0])
-	h.functionRunner.cachingOptions.imageCacheMaxNumber = cacheNum
+	containerPoolLimit := q["container_pool_limit"]
+	if len(containerPoolLimit) > 0 {
+		val, _ := strconv.Atoi(containerPoolLimit[0])
+		h.functionRunner.cachingOptions.ContainerPoolLimit = val
+		message = "configure changed"
+	}
 
-	resp := ConfigureSuccessResponse{"success", "configure changed successfully"}
+	containerPoolNum := q["container_pool_num"]
+	if len(containerPoolNum) > 0 {
+		val, _ := strconv.Atoi(containerPoolNum[0])
+		h.functionRunner.cachingOptions.ContainerPoolNum = val
+		message = "configure changed"
+	}
+
+	resp := ConfigureSuccessResponse{message, h.functionRunner.cachingOptions}
 	bytes, _ := json.Marshal(resp)
 	(*w).Write(bytes)
 }

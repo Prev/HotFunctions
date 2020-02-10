@@ -8,14 +8,14 @@ import (
 )
 
 type ContainerPoolManager struct {
-	poolSize int
+	cachingOptions *CachingOptions
 	pool     []string
 	mutex    *sync.Mutex
 }
 
-func NewContainerPoolManager(poolSize int) *ContainerPoolManager {
+func NewContainerPoolManager(cachingOptions *CachingOptions) *ContainerPoolManager {
 	m := new(ContainerPoolManager)
-	m.poolSize = poolSize
+	m.cachingOptions = cachingOptions
 	m.pool = make([]string, 0)
 	m.mutex = new(sync.Mutex)
 	return m
@@ -49,7 +49,7 @@ func (m *ContainerPoolManager) MakePool(functionName string) {
 		}
 	}
 
-	for i := 0; i < m.poolSize - existentPoolNum; i++ {
+	for i := 0; i < m.cachingOptions.ContainerPoolNum - existentPoolNum; i++ {
 		containerName, _ := CreateContainer(functionName)
 		m.pool = append(m.pool, containerName)
 	}
