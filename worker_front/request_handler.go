@@ -76,6 +76,19 @@ func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Reque
 		message = "configure changed"
 	}
 
+	usingRestMode := q["using_rest_mode"]
+	if len(usingRestMode) > 0 {
+		if usingRestMode[0] == "true" {
+			h.functionRunner.cachingOptions.UsingRestMode = true
+			message = "configure changed"
+		} else if usingRestMode[0] == "false" {
+			h.functionRunner.cachingOptions.UsingRestMode = false
+			message = "configure changed"
+		}
+
+		h.functionRunner.images = make(map[string]Image)
+	}
+
 	resp := ConfigureSuccessResponse{message, h.functionRunner.cachingOptions}
 	bytes, _ := json.Marshal(resp)
 	(*w).Write(bytes)

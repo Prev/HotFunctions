@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/go-connections/nat"
+	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +16,14 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 )
+
+type Container struct {
+	Name           string
+	FunctionName   string
+	Reusable       bool
+	IsRestMode     bool
+	RestModePort   string
+}
 
 type FunctionResponse struct {
 	StartTime int64                  `json:"startTime"`
@@ -25,61 +36,119 @@ type FunctionResponseResult struct {
 	Body       string `json:"body"`
 }
 
-func CreateContainer(functionName string) (string, error) {
-	imageName := imageTagName(functionName)
+func CreateContainer(image Image) (Container, error) {
 	ctx := context.Background()
 
-	containerName := fmt.Sprintf("%s__%d_%d", imageName, time.Now().Unix(), rand.Intn(100000))
+	containerName := fmt.Sprintf("%s_%s__%d_%d",
+		"lalb_",
+		strings.ToLower(image.FunctionName),
+		time.Now().Unix() % 100000,
+		rand.Intn(100000),
+	)
 
-	_, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: imageName,
-	}, nil, nil, containerName)
+	cont := Container{
+		containerName,
+		image.FunctionName,
+		false,
+		false,
+		"",
+	}
+	if image.IsRestMode {
+		cont.Reusable = true
+		cont.IsRestMode = true
+		cont.RestModePort = strconv.Itoa(rand.Intn(1000) + 9000)
 
-	if err != nil {
-		return "", err
+		_, err := cli.ContainerCreate(ctx,
+			&container.Config{
+				Image: image.Name,
+				ExposedPorts: nat.PortSet{
+					"8080/tcp": struct{}{},
+				},
+			},
+			&container.HostConfig{
+				PortBindings: nat.PortMap{
+					"8080/tcp": []nat.PortBinding{
+						{
+							HostIP:   "127.0.0.1",
+							HostPort: cont.RestModePort,
+						},
+					},
+				},
+			},
+			nil,
+			containerName,
+		)
+		if err != nil {
+			return Container{}, err
+		}
+		if err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{}); err != nil {
+			return Container{}, err
+		}
+		time.Sleep(time.Second)
+
+	} else {
+		_, err := cli.ContainerCreate(ctx, &container.Config{
+			Image: image.Name,
+		}, nil, nil, containerName)
+		if err != nil {
+			return Container{}, err
+		}
 	}
 
-	//return resp.ID, nil
-	return containerName, nil
+	return cont, nil
 }
 
 func containerBelongsToFunction(containerName string, functionName string) bool {
-	return strings.Split(containerName, "__")[0] == imageTagName(functionName)
+	return strings.Split(containerName, "__")[0] == "lalb_" + strings.ToLower(functionName)
 }
 
-func RunContainer(containerID string) (*FunctionResponse, error) {
+func (c Container) Run() (*FunctionResponse, error) {
+	containerID := c.Name
 	ctx := context.Background()
 
-	if err := cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
-		return nil, err
-	}
+	data := ""
 
-	statusCh, errCh := cli.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
+	if c.IsRestMode == false {
+		if err := cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
+			return nil, err
+		}
+
+		statusCh, errCh := cli.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+		select {
+		case err := <-errCh:
+			if err != nil {
+				return nil, err
+			}
+		case <-statusCh:
+		}
+
+		out, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{ShowStdout: true})
 		if err != nil {
 			return nil, err
 		}
-	case <-statusCh:
-	}
 
-	out, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{ShowStdout: true})
-	if err != nil {
-		return nil, err
-	}
+		if err := cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{}); err != nil {
+			return nil, err
+		}
 
-	if err := cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{}); err != nil {
-		return nil, err
-	}
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(out)
+		data = buf.String()
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(out)
-	log := buf.String()
+	} else {
+		resp, err := http.Get("http://localhost:" + c.RestModePort)
+		if err != nil {
+			return nil, err
+		}
+
+		bytes, _ := ioutil.ReadAll(resp.Body)
+		data = string(bytes)
+	}
 
 	// Handle magic strings
 	// Log can be multiple lines if the container is executed multiple times.
 	// So we use the last line of the logs, and the line separator is `==--==--==--==--==` in our system.
-	lines := strings.Split(log, "==--==--==--==--==")
+	lines := strings.Split(data, "==--==--==--==--==")
 	lastLine := lines[len(lines) - 2]
 
 	// Sample line of the log is like below:
@@ -94,7 +163,7 @@ func RunContainer(containerID string) (*FunctionResponse, error) {
 	jsonStr := lastLine[idx+11 : idx+11+int(jsonLength)]
 
 	var fr FunctionResponse
-	err = json.Unmarshal([]byte(jsonStr), &fr)
+	err := json.Unmarshal([]byte(jsonStr), &fr)
 
 	if err != nil {
 		return nil, err

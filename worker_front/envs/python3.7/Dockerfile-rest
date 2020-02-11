@@ -1,0 +1,21 @@
+FROM python:3.7-alpine
+WORKDIR /usr/src/app
+
+RUN apk add go
+RUN echo $'package main \n\
+\n\
+import ("net/http"; "os/exec") \n\
+\n\
+func main() { \n\
+    http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) { \n\
+        out, _ := exec.Command("python", "__entry.py").Output() \n\
+        w.Write(out) \n\
+    }) \n\
+    http.ListenAndServe(":8080", nil) \n\
+}' > main.go
+RUN go build main.go
+
+COPY . .
+
+EXPOSE 8080
+CMD ["./main"]

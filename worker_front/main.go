@@ -20,6 +20,7 @@ type CachingOptions struct {
 	ImageLimit         int
 	ContainerPoolLimit int
 	ContainerPoolNum   int
+	UsingRestMode      bool
 }
 
 func main() {
@@ -71,6 +72,10 @@ func runWorkerFront(port int) {
 	imageCacheLimit := getEnvInt("IMAGE_CACHE_LIMIT", -1)
 	containerPoolLimit := getEnvInt("CONTAINER_POOL_LIMIT", -1)
 	containerPoolNum := getEnvInt("CONTAINER_POOL_NUM", 4)
+	usingRestMode := false
+	if getEnvString("USING_REST_MODE", "") != "" {
+		usingRestMode = true
+	}
 
 	runtime.GOMAXPROCS(goMaxProcs)
 
@@ -87,6 +92,7 @@ func runWorkerFront(port int) {
 		imageCacheLimit,
 		containerPoolLimit,
 		containerPoolNum,
+		usingRestMode,
 	}))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 
