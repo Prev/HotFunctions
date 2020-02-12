@@ -40,7 +40,7 @@ func CreateContainer(image Image) (Container, error) {
 	ctx := context.Background()
 
 	containerName := fmt.Sprintf("%s_%s__%d_%d",
-		"lalb_",
+		"hf_",
 		strings.ToLower(image.FunctionName),
 		time.Now().Unix() % 100000,
 		rand.Intn(100000),
@@ -57,6 +57,8 @@ func CreateContainer(image Image) (Container, error) {
 		cont.Reusable = true
 		cont.IsRestMode = true
 		cont.RestModePort = strconv.Itoa(rand.Intn(1000) + 9000)
+
+		logger.Println("Start rest-mode container with port ", cont.RestModePort)
 
 		_, err := cli.ContainerCreate(ctx,
 			&container.Config{
@@ -99,7 +101,7 @@ func CreateContainer(image Image) (Container, error) {
 }
 
 func containerBelongsToFunction(containerName string, functionName string) bool {
-	return strings.Split(containerName, "__")[0] == "lalb_" + strings.ToLower(functionName)
+	return strings.Split(containerName, "__")[0] == "hf_" + strings.ToLower(functionName)
 }
 
 func (c Container) Run() (*FunctionResponse, error) {

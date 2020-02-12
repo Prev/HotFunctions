@@ -1,4 +1,4 @@
-module github.com/Prev/LALB/load_balancer/scheduler
+module github.com/Prev/HotFunctions/load_balancer/scheduler
 
 go 1.13
 

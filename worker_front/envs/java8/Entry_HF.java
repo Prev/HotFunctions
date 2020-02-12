@@ -2,7 +2,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import main.Main;
 
-public class Entry_LALBFunction {
+public class Entry_HF {
     public static void main(String args[]) {
 
 		long startTime = System.currentTimeMillis();

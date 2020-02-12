@@ -1,4 +1,4 @@
-package main // import "github.com/Prev/LALB/worker_front"
+package main
 
 import (
 	"fmt"

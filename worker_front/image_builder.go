@@ -238,7 +238,7 @@ func (b *ImageBuilder) RemoveImage(functionName string) error {
 
 func (b *ImageBuilder) imageTagName(functionName string) string {
 	if b.cachingOptions.UsingRestMode {
-		return "lalb_" + strings.ToLower(functionName) + "_rest"
+		return "hf_" + strings.ToLower(functionName) + "_rest"
 	}
-	return "lalb_" + strings.ToLower(functionName)
+	return "hf_" + strings.ToLower(functionName)
 }

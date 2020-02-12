@@ -1,4 +1,4 @@
-module github.com/Prev/LALB/worker_front
+module github.com/Prev/HotFunctions/worker_front
 
 go 1.13
 

@@ -8,7 +8,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
-public class Entry_LALBRestServer {
+public class Entry_HFRestServer {
 
     public static void main(String[] args) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
@@ -26,7 +26,7 @@ public class Entry_LALBRestServer {
             Process process;
 
             try {
-                process = runtime.exec("java -cp .:lib/gson-2.8.6.jar Entry_LALBFunction");
+                process = runtime.exec("java -cp .:lib/gson-2.8.6.jar Entry_HF");
                 process.waitFor();
 
             } catch(Exception e) {

@@ -12,3 +12,8 @@ Distribute functions to worker nodes. There are 4 different scheduling algorithm
 ```bash
 go run *.go ll|ch|tb|ad
 ```
+
+
+```bash
+go get -u github.com/lafikl/consistent
+```
