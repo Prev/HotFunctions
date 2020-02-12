@@ -22,8 +22,10 @@ def stdd(datalist):
 with open(sys.argv[1], 'r') as file:
 	log = file.readlines()
 
-NUM_NODES = 6
 
+NUM_NODES = 8
+
+# Init data structures
 ret = [{} for _ in range(0, NUM_NODES)]
 std_time = 999999999999
 
@@ -39,6 +41,7 @@ warm_per_functions = {}
 warm_latencies = []
 cold_latencies = []
 
+# Parse log
 for row in log:
 	if len(row) <= 1:
 		continue
@@ -79,10 +82,13 @@ for row in log:
 	durations.append(duration)
 	latencies.append(latency)
 
-# print('--------------- # of distinct functions ---------------')
 avg_num_df = []
 per_time = [0] * 26
 for node_index, data in enumerate(ret):
+
+	# Sample format of `data`:
+	#   1581056653: {'W7': 1, 'T2': 1, 'W4': 2, 'W5': 2, 'D3': 1}
+
 	arr = [len(d.keys()) for d in data.values()]
 	# print('[Node %d] %s (avg. %.1f)' % (
 	# 	node_index,
@@ -102,13 +108,15 @@ for node_index, data in enumerate(ret):
 # 	), end=' ')
 # print('')
 
+
+print("------------------------Locality------------------------")
+print("%.1f%%" % (1 / avg(avg_num_df) * 100))
 print('# of distinct functions for each node: %.1f (stddev.: %.1f)' % (
 	avg(avg_num_df),
 	stdd(avg_num_df),
 ))
 
 
-# print('-------------------- loads --------------------')
 avg_executions = []
 avg_capacities = []
 
@@ -122,29 +130,23 @@ for node_index, data in enumerate(ret):
 	avg_executions.append(avg(arr))
 	avg_capacities.append(8-avg(arr))
 
-print('executions per node/sec: %.2f (stddev.: %.2f)' % (
-	avg(avg_executions),
+
+print("------------------------Imbalance------------------------")
+
+print('CV: %.2f (sttdev.: %.2f, avg: %.2f)' % (
+	stdd(avg_executions) / avg(avg_executions),
+	stdd(avg_executions),
 	stdd(avg_executions),
 ))
 
-# for i, d in enumerate(avg_executions):
-# 	print('%.2f & ' % d, end='')
-# print('%.2f & %.2f' % (avg(avg_executions), stdd(avg_executions)))
 
-# print('capacities per node/sec: %.1f (stddev.: %.1f)' % (
-# 	avg(avg_capacities),
-# 	stdd(avg_capacities),
-# ))
-
-sys.exit(0)
-
-# print('-------------------- warm/cold --------------------')
+print('-------------------- warm/cold --------------------')
 print('# of warm starts:', num_warm_starts)
 print('# of cold starts:', num_cold_starts)
 print('warm (%%): %d%%' % (num_warm_starts / (num_warm_starts + num_cold_starts) * 100))
 
 
-# print('-------------------- exec time / latency --------------------')
+print('-------------------- exec time / latency --------------------')
 # for key, arr in sorted(durations_per_functions.items(), key=lambda e: e[0]):
 # 	print('[%s]: avg exec time: %dms, avg latency: %dms, warm: %d/%d' % (
 # 		key,

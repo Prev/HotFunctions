@@ -13,13 +13,15 @@ DATA_PROCESSING = 'data_processing'
 THIRD_PARTY = '3rd-party'
 INTERNAL_TOOLING = 'internal_tooling'
 
+EXPERIMENTAL_TIME = 60 * 10 # 10min
+
 def random_dist(call_per_sec):
 	# call per minutes
-	total = round(call_per_sec * 60)
+	total = round(call_per_sec * EXPERIMENTAL_TIME)
 
 	ret = []
 	for _ in range(total):
-		t = math.floor(random.random() * 60 * 1000) # msec
+		t = math.floor(random.random() * EXPERIMENTAL_TIME * 1000) # msec
 		ret.append(t)
 	return ret
 
@@ -32,18 +34,23 @@ functions = [
 	('W6', WEBSERVER, random_dist(1.5)),
 	('W7', WEBSERVER, random_dist(1)),
 	('W8', WEBSERVER, random_dist(0.2)),
-	('W9', WEBSERVER, random_dist(0.0)),
-	('D1', DATA_PROCESSING, [5000, 30000]),
-	('D2', DATA_PROCESSING, [6000, 6000, 6000]),
-	('D3', DATA_PROCESSING, [3000, 33000]),
-	('D4', DATA_PROCESSING, [5000, 20000, 30000, 40000]),
-	('D5', DATA_PROCESSING, [6000, 23000, 33000, 43000]),
+	('W9', WEBSERVER, random_dist(0.1)),
+# 	('D1', DATA_PROCESSING, [5000, 30000]),
+# 	('D2', DATA_PROCESSING, [6000, 6000, 6000]),
+# 	('D3', DATA_PROCESSING, [3000, 33000]),
+# 	('D4', DATA_PROCESSING, [5000, 20000, 30000, 40000]),
+# 	('D5', DATA_PROCESSING, [6000, 23000, 33000, 43000]),
+    ('D1', DATA_PROCESSING, random_dist(0.033)),
+	('D2', DATA_PROCESSING, random_dist(0.05)),
+	('D3', DATA_PROCESSING, random_dist(0.033)),
+	('D4', DATA_PROCESSING, random_dist(0.066)),
+	('D5', DATA_PROCESSING, random_dist(0.066)),
 	('T1', THIRD_PARTY, random_dist(0.1)),
 	('T2', THIRD_PARTY, random_dist(0.2)),
 	('T3', THIRD_PARTY, random_dist(0.3)),
-	('I1', INTERNAL_TOOLING, [0, 10000, 20000, 30000, 40000, 50000]),
-	('I2', INTERNAL_TOOLING, [2000, 12000, 22000, 32000, 42000, 52000]),
-	('I3', INTERNAL_TOOLING, [4000, 14000, 24000, 34000, 44000, 54000]),
+	('I1', INTERNAL_TOOLING, random_dist(0.01)),
+	('I2', INTERNAL_TOOLING, random_dist(0.01)),
+	('I3', INTERNAL_TOOLING, random_dist(0.01)),
 ]
 
 event_stream = []

@@ -26,7 +26,7 @@ func startSimulation(eventStreamPath string, action func(string, int)) {
 
 	tick := 0
 	i := 0
-	for tick <= 60000 {
+	for tick <= 60 * 10 * 1000 {
 		if i >= len(rows) {
 			break
 		}
