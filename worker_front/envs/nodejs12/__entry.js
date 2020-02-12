@@ -3,23 +3,21 @@ const m = require('./index.js');
 const startTime = (new Date()).getTime();
 let result = m.handle();
 
-if (result instanceof Promise) {
-	result.then(realResult => {
-		const endTime = (new Date()).getTime();
-		const dummpedData = JSON.stringify({
-			startTime: startTime,
-			result: realResult,
-			endTime: endTime,
-		})
-		console.log('-----' + dummpedData.length + '-----=' + dummpedData);
-	});
-
-} else {
+function printResult(result) {
 	const endTime = (new Date()).getTime();
-	const dummpedData = JSON.stringify({
+	const dumpedData = JSON.stringify({
 		startTime: startTime,
 		result: result,
 		endTime: endTime,
-	})
-	console.log('-----' + dummpedData.length + '-----=' + dummpedData);
+	});
+	console.log('-=-=-=-=-=' + dumpedData.length + '-=-=-=-=-=>' + dumpedData + '==--==--==--==--==');
+}
+
+if (result instanceof Promise) {
+	result.then(realResult => {
+		printResult(realResult);
+	});
+
+} else {
+	printResult(result);
 }

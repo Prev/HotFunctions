@@ -106,6 +106,10 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 
 	functionName := nameParam[0]
 	out, meta := h.functionRunner.runFunction(functionName)
+	if out == nil {
+		writeFailResponse(w, "error on running a function")
+		return
+	}
 
 	endTime := makeTimestamp()
 	logger.Println("fin", functionName)

@@ -15,11 +15,11 @@ type FunctionRunner struct {
 }
 
 type runningMetaData struct {
-	ImageBuilt              bool
-	UsingPooledContainer    bool
-	UsingRestContainer      bool
-	ContainerName           string
-	ImageName               string
+	ImageBuilt                 bool
+	UsingPooledContainer       bool
+	UsingExistingRestContainer bool
+	ContainerName              string
+	ImageName                  string
 }
 
 func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
@@ -70,7 +70,7 @@ BuildImage:
 			}
 			// Record meta data
 			if selected.IsRestMode {
-				meta.UsingRestContainer = true
+				meta.UsingExistingRestContainer = true
 			} else {
 				meta.UsingPooledContainer = true
 			}

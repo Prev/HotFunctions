@@ -16,6 +16,6 @@ public class Entry_LALBFunction {
 		object.add("result", new Gson().toJsonTree(out));
 		String jsonString = gson.toJson(object);
 
-		System.out.printf("-----%d-----=%s\n", jsonString.length(), jsonString);
+		System.out.printf("-=-=-=-=-=%d-=-=-=-=-=>%s==--==--==--==--==\n", jsonString.length(), jsonString);
     }
 }

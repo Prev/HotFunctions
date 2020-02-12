@@ -6,7 +6,7 @@ import json
 if __name__ == '__main__':
 	event = os.environ.get('event', {})
 	context = os.environ.get('context', {})
-	
+
 	start_time = time.time()
 	result = lambda_handler(event, context)
 	end_time = time.time()
