@@ -107,6 +107,7 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	} else {
 		resp, err := http.Get(node.Url + "/execute?name=" + functionName)
 		if err != nil {
+			println(err.Error())
 			writeFailResponse(w, "error on sending http request on worker node")
 			return
 		}
