@@ -20,6 +20,7 @@ var logger *log.Logger
 var sched scheduler.Scheduler
 var schedType string
 var fakeMode = false
+var nodes []*scheduler.Node
 
 func main() {
 	if len(os.Args) < 2 {
@@ -27,7 +28,6 @@ func main() {
 		os.Exit(-1)
 	}
 	schedType = os.Args[1]
-	var nodes []*scheduler.Node
 
 	if len(os.Args) > 2 {
 		intVal, err := strconv.Atoi(os.Args[2])

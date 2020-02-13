@@ -28,7 +28,7 @@ func main() {
 	// and executed with goroutine, which means multiple functions can be run concurrently
 	startSimulation(eventStreamFileName, func(functionName string, virtualTime int) {
 		// StartTime will be recorded before running function & running scheduling algorithm
-		startTime := time.Now().UnixNano()
+		startTime := time.Now().UnixNano() / int64(time.Millisecond)
 
 		// Request function to load balancer
 		resp, err := runFunction(lbUrl, functionName)
@@ -37,13 +37,12 @@ func main() {
 		}
 
 		// Calculate times from endTime and startTime
-		endTime := time.Now().UnixNano()
-		duration := (endTime - startTime) / int64(time.Millisecond)
+		endTime := time.Now().UnixNano() / int64(time.Millisecond)
 
-		fmt.Printf("%s in %dms\n", functionName, duration)
+		fmt.Printf("%s in %dms\n", functionName, endTime - startTime)
 
 		// Log result to the file
-		logMsg := fmt.Sprintf(resp)
+		logMsg := fmt.Sprintf("%d %d %s %s", startTime, endTime, functionName, resp)
 		logger.Output(2, logMsg)
 	})
 

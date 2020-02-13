@@ -1,6 +1,7 @@
 import math
 import json
 import sys
+import re
 
 if len(sys.argv) < 2:
 	print('Usage: python analyzer.py <path/to/log>')
@@ -41,21 +42,32 @@ warm_per_functions = {}
 warm_latencies = []
 cold_latencies = []
 
+LOG_FORMAT = re.compile('(\S+)\s(\S+)\s(\d+)\s(\d+)\s(\S+)\s(\S+)')
+
 # Parse log
 for row in log:
 	if len(row) <= 1:
 		continue
-	date, time, node_index, function_name, start_type, start_time, duration, latency = row.split(" ")
+
+	matches = LOG_FORMAT.search(row)
+	start_time = int(matches.group(3))
+	end_time = int(matches.group(4))
+	function_name = matches.group(5)
+	data = json.loads(matches.group(6))
+
+	# date, time, node_index, function_name, start_type, start_time, duration, latency = row.split(" ")
 	
 	start_time = int(start_time)
-	duration = int(duration)
-	latency = int(latency)
-	node_index = int(node_index)
-	
-	s = math.floor(start_time / 1000)
-	e = math.ceil((start_time + duration) / 1000)
+	# duration = int(duration)
+	# latency = int(latency)
+	# node_index = int(node_index)
 
-	node_ret = ret[node_index]
+	node_id = data['LoadBalancingInfo']['WorkerNodeId']
+
+	s = math.floor(start_time / 1000)
+	e = math.ceil(end_time / 1000)
+
+	node_ret = ret[node_id]
 	for i in range(s, e):
 		if i not in node_ret:
 			node_ret[i] = {}
@@ -69,13 +81,17 @@ for row in log:
 		latencies_per_functions[function_name] = []
 		warm_per_functions[function_name] = 0
 
-	if start_type == 'warm':
-		num_warm_starts += 1
-		warm_per_functions[function_name] += 1
-		warm_latencies.append(latency)
-	else:
-		num_cold_starts += 1
-		cold_latencies.append(latency)
+	# if start_type == 'warm':
+	# 	num_warm_starts += 1
+	# 	warm_per_functions[function_name] += 1
+	# 	warm_latencies.append(latency)
+	# else:
+	# 	num_cold_starts += 1
+	# 	cold_latencies.append(latency)
+
+	# duration = data['ExecutionTime']
+	duration = end_time - start_time
+	latency = data['InternalExecutionTime']
 
 	durations_per_functions[function_name].append(duration)
 	latencies_per_functions[function_name].append(latency)
@@ -84,14 +100,14 @@ for row in log:
 
 avg_num_df = []
 per_time = [0] * 26
-for node_index, data in enumerate(ret):
+for node_id, data in enumerate(ret):
 
 	# Sample format of `data`:
 	#   1581056653: {'W7': 1, 'T2': 1, 'W4': 2, 'W5': 2, 'D3': 1}
 
 	arr = [len(d.keys()) for d in data.values()]
 	# print('[Node %d] %s (avg. %.1f)' % (
-	# 	node_index,
+	# 	node_id,
 	# 	join2(arr),
 	# 	avg(arr)
 	# ))
@@ -140,10 +156,10 @@ print('CV: %.2f (sttdev.: %.2f, avg: %.2f)' % (
 ))
 
 
-print('-------------------- warm/cold --------------------')
-print('# of warm starts:', num_warm_starts)
-print('# of cold starts:', num_cold_starts)
-print('warm (%%): %d%%' % (num_warm_starts / (num_warm_starts + num_cold_starts) * 100))
+# print('-------------------- warm/cold --------------------')
+# print('# of warm starts:', num_warm_starts)
+# print('# of cold starts:', num_cold_starts)
+# print('warm (%%): %d%%' % (num_warm_starts / (num_warm_starts + num_cold_starts) * 100))
 
 
 print('-------------------- exec time / latency --------------------')
@@ -160,6 +176,3 @@ print('avg exec time: %dms\navg latency: %dms' % (
 	avg(durations),
 	avg(latencies),
 ))
-
-print('avg. latency for warm starts: %d' % avg(warm_latencies))
-print('avg. latency for cold starts: %d' % avg(cold_latencies))

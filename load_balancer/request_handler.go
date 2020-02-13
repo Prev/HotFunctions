@@ -39,12 +39,40 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	switch req.URL.Path {
+	case "/configure":
+		h.ConfigureBalancer(&w, req)
 	case "/execute":
 		h.ExecFunction(&w, req)
 	default:
 		w.WriteHeader(404)
 		writeFailResponse(&w, "404 Not found on given path")
 	}
+}
+
+func (h *RequestHandler) ConfigureBalancer(w *http.ResponseWriter, req *http.Request) {
+	isFirst := true
+
+	(*w).Write([]byte("{"))
+
+	for _, node := range nodes {
+		resp, err := http.Get(node.Url + "/configure?" + req.URL.RawQuery)
+		if err != nil {
+			println(err.Error())
+			continue
+		}
+
+		if isFirst {
+			isFirst = false
+		} else {
+			(*w).Write([]byte(","))
+		}
+
+		bytes, _ := ioutil.ReadAll(resp.Body)
+		(*w).Write([]byte("\"" + node.Url +  "\":"))
+		(*w).Write(bytes)
+		(*w).Write([]byte("\n"))
+	}
+	(*w).Write([]byte("}"))
 }
 
 func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request) {
@@ -68,7 +96,7 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	if fakeMode {
 		ret.Result = types.ContainerResponseData{0, ""}
 		ret.InternalExecutionTime = 500
-		ret.ExecutionTime = 500
+		ret.ExecutionTime = 1000
 		ret.Meta = types.FunctionExecutionMetaData{false, false, false, "", ""}
 		time.Sleep(time.Second)
 
