@@ -8,21 +8,21 @@ import (
 
 type OurScheduler struct {
 	Scheduler
-	nodes    *[]*Node
-	assigned map[string][]*Node
-	running  map[int]map[string]int
-	T_MAX uint
-	T_OPT uint
-	CACHE_SIZE int
-	mutex    *sync.Mutex
+	nodes     *[]*Node
+	assigned  map[string][]*Node
+	running   map[int]map[string]int
+	TMax      uint
+	TOpt      uint
+	CacheSize int
+	mutex     *sync.Mutex
 }
 
-func NewOurScheduler(nodes *[]*Node, T_MAX uint, T_OPT uint, cacheSize int) *OurScheduler {
+func NewOurScheduler(nodes *[]*Node, TMax uint, TOpt uint, cacheSize int) *OurScheduler {
 	s := OurScheduler{}
 	s.nodes = nodes
-	s.T_MAX = T_MAX
-	s.T_OPT = T_OPT
-	s.CACHE_SIZE = cacheSize
+	s.TMax = TMax
+	s.TOpt = TOpt
+	s.CacheSize = cacheSize
 	s.assigned = make(map[string][]*Node)
 	s.mutex = new(sync.Mutex)
 
@@ -73,17 +73,27 @@ func (s OurScheduler) Finished(node *Node, functionName string) error {
 }
 
 func (s OurScheduler) available(node *Node, f string) bool {
-	if node.Load >= s.T_MAX {
+	if node.Load >= s.TMax {
 		// Task is overloaded
 		return false
 
-	} else if node.Load >= s.T_OPT {
+	} else if node.Load >= s.TOpt {
 		// Work load is going full, only accept for the major applications
-		majorFunctions := sliceTopN(s.running[node.Id], s.CACHE_SIZE)
+		majorFunctions := sliceTopN(s.running[node.Id], s.CacheSize)
 		for _, fi := range majorFunctions {
 			if fi == f {
 				return true
 			}
+		}
+		// De-assign node from assigned table
+		idx := -1
+		for i, n := range s.assigned[f] {
+			if n == node {
+				idx = i
+			}
+		}
+		if idx != -1 {
+			s.assigned[f] = append(s.assigned[f][:idx], s.assigned[f][idx+1:]...)
 		}
 		return false
 

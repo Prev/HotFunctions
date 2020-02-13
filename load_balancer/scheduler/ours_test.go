@@ -35,10 +35,13 @@ func Test_Ours(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		//t.Log(i, fn, node.Id)
 		if node.Id != expectedNodes[i] {
 			t.Fatal("Expected nodeId:", expectedNodes[i], ", real: ", node.Id)
 		}
+	}
+
+	if len(sched.assigned["C"]) != 1 || sched.assigned["C"][0].Id != 0 {
+		t.Fatal("The only assigned node of C should be Node0")
 	}
 }
 
