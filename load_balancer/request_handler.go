@@ -29,9 +29,10 @@ type Response struct {
 }
 
 type LoadBalancingInfoType struct {
-	WorkerNodeId   int
-	WorkerNodeUrl  string
-	Algorithm      string
+	WorkerNodeId     int
+	WorkerNodeUrl    string
+	Algorithm        string
+	AlgorithmLatency float64
 }
 
 func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -85,7 +86,10 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	}
 	functionName := nameParam[0]
 
+	algorithmStartTime := float64(time.Now().UnixNano()) / float64(time.Millisecond)
 	node, err := sched.Select(functionName)
+	algorithmEndTime := float64(time.Now().UnixNano()) / float64(time.Millisecond)
+
 	if err != nil {
 		writeFailResponse(w, "error on selecting node from scheduler")
 		return
@@ -120,6 +124,7 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 		node.Id,
 		node.Url,
 		schedType,
+		algorithmEndTime - algorithmStartTime,
 	}
 	bytes, _ := json.Marshal(ret)
 	(*w).Write(bytes)
