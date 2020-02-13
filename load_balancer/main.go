@@ -11,11 +11,6 @@ import (
 	"strconv"
 )
 
-type NodeConfigData struct {
-	Url         string `json:"url"`
-	MaxCapacity int    `json:"maxCapacity"`
-}
-
 var logger *log.Logger
 var sched scheduler.Scheduler
 var schedType string
@@ -86,7 +81,6 @@ GuessSchedType:
 		panic(err)
 	}
 }
-
 // Init node list from the config file
 func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 	nodeConfigFile, err := os.Open(configFilePath)
@@ -95,13 +89,13 @@ func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 	}
 	defer nodeConfigFile.Close()
 
-	var nodeConfigs []NodeConfigData
+	var nodeConfigs []string
 	byteValue, _ := ioutil.ReadAll(nodeConfigFile)
-	json.Unmarshal([]byte(byteValue), &nodeConfigs)
+	json.Unmarshal(byteValue, &nodeConfigs)
 
 	nodes := make([]*scheduler.Node, len(nodeConfigs))
-	for i, nc := range nodeConfigs {
-		nodes[i] = scheduler.NewNode(i, nc.Url)
+	for i, url := range nodeConfigs {
+		nodes[i] = scheduler.NewNode(i, url)
 	}
 	return nodes
 }
