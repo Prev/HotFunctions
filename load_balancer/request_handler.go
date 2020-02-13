@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"strconv"
+	"time"
+
+	"github.com/Prev/HotFunctions/worker_front/types"
 )
 
 type RequestHandler struct {
@@ -22,16 +24,10 @@ type FailResponse struct {
 }
 
 type Response struct {
-	Result                FunctionExecutionResult
-	IsWarm                bool
-	ExecutionTime         int64
-	InternalExecutionTime int64
-	LoadBalancingInfo     LoadBalancingInfoType
+	types.ExecSuccessResponse
+	LoadBalancingInfo LoadBalancingInfoType
 }
-type FunctionExecutionResult struct {
-	StatusCode int    `json:"statusCode"`
-	Body       string `json:"body"`
-}
+
 type LoadBalancingInfoType struct {
 	WorkerNodeId   int
 	WorkerNodeUrl  string
@@ -63,34 +59,41 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 
 	node, err := sched.Select(functionName)
 	if err != nil {
-		writeFailResponse(w, "err on selecting node from scheduler")
+		writeFailResponse(w, "error on selecting node from scheduler")
 		return
 	}
+	defer sched.Finished(node, functionName)
 
-	resp, err := http.Get(node.Url + "/execute?name=" + functionName)
-	sched.Finished(node, functionName)
+	ret := Response{}
+	if fakeMode {
+		ret.Result = types.ContainerResponseData{0, ""}
+		ret.InternalExecutionTime = 500
+		ret.ExecutionTime = 500
+		ret.Meta = types.FunctionExecutionMetaData{false, false, false, "", ""}
+		time.Sleep(time.Second)
 
-	if err != nil {
-		writeFailResponse(w, "err on sending http request on worker node")
-		return
+	} else {
+		resp, err := http.Get(node.Url + "/execute?name=" + functionName)
+		if err != nil {
+			writeFailResponse(w, "error on sending http request on worker node")
+			return
+		}
+
+		bytes, _ := ioutil.ReadAll(resp.Body)
+		if err := json.Unmarshal(bytes, &ret); err != nil {
+			println(err.Error())
+			println(string(bytes))
+			writeFailResponse(w, "error on parsing json from worker node")
+			return
+		}
 	}
 
-	bytes, _ := ioutil.ReadAll(resp.Body)
-	var ret Response
-	if err := json.Unmarshal(bytes, &ret); err != nil {
-		println(err.Error())
-		println(string(bytes))
-	}
 	ret.LoadBalancingInfo = LoadBalancingInfoType{
 		node.Id,
 		node.Url,
 		schedType,
 	}
-	bytes, _ = json.Marshal(ret)
-
-	(*w).Header().Set("X-Balancing-Algorithm", schedType)
-	(*w).Header().Set("X-Node-ID", strconv.Itoa(node.Id))
-	(*w).Header().Set("X-Node-URL", node.Url)
+	bytes, _ := json.Marshal(ret)
 	(*w).Write(bytes)
 }
 

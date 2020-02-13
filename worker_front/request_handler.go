@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/Prev/HotFunctions/worker_front/types"
 )
 
 // RequestHandler of the worker front
@@ -27,13 +29,6 @@ type FailResponse struct {
 type ConfigureSuccessResponse struct {
 	Message string
 	State   CachingOptions
-}
-
-type ExecSuccessResponse struct {
-	Result                FunctionResponseResult
-	ExecutionTime         int64
-	InternalExecutionTime int64
-	Meta                  runningMetaData
 }
 
 func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -114,8 +109,8 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	endTime := makeTimestamp()
 	logger.Println("fin", functionName)
 
-	resp := ExecSuccessResponse{
-		out.Result,
+	resp := types.ExecSuccessResponse{
+		out.Data,
 		endTime - startTime,
 		out.EndTime - out.StartTime,
 		meta,

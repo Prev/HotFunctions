@@ -3,6 +3,8 @@ package main
 import (
 	"sync"
 	"time"
+
+	"github.com/Prev/HotFunctions/worker_front/types"
 )
 
 type FunctionRunner struct {
@@ -12,14 +14,6 @@ type FunctionRunner struct {
 	images               map[string]Image
 	containers           []Container
 	mutex                *sync.Mutex
-}
-
-type runningMetaData struct {
-	ImageBuilt                 bool
-	UsingPooledContainer       bool
-	UsingExistingRestContainer bool
-	ContainerName              string
-	ImageName                  string
 }
 
 func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
@@ -33,9 +27,9 @@ func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
 	return r
 }
 
-func (r *FunctionRunner) runFunction(functionName string) (*FunctionResponse, runningMetaData) {
+func (r *FunctionRunner) runFunction(functionName string) (*types.ContainerResponse, types.FunctionExecutionMetaData) {
 	var err error
-	meta := runningMetaData{false, false, false, "", ""}
+	meta := types.FunctionExecutionMetaData{false, false, false, "", ""}
 
 	// Step1: Check for the image existence.
 	// If there is no cached image, build a new docker image

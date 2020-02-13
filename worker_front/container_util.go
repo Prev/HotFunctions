@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 )
 
 type Container struct {
@@ -23,17 +24,6 @@ type Container struct {
 	Reusable       bool
 	IsRestMode     bool
 	RestModePort   string
-}
-
-type FunctionResponse struct {
-	StartTime int64                  `json:"startTime"`
-	EndTime   int64                  `json:"endTime"`
-	Result    FunctionResponseResult `json:"result"`
-}
-
-type FunctionResponseResult struct {
-	StatusCode int    `json:"statusCode"`
-	Body       string `json:"body"`
 }
 
 func CreateContainer(image Image) (Container, error) {
@@ -104,7 +94,7 @@ func containerBelongsToFunction(containerName string, functionName string) bool 
 	return strings.Split(containerName, "__")[0] == "hf_" + strings.ToLower(functionName)
 }
 
-func (c Container) Run() (*FunctionResponse, error) {
+func (c Container) Run() (*dtypes.ContainerResponse, error) {
 	containerID := c.Name
 	ctx := context.Background()
 
@@ -164,7 +154,7 @@ func (c Container) Run() (*FunctionResponse, error) {
 	// Finally slice the log with the length
 	jsonStr := lastLine[idx+11 : idx+11+int(jsonLength)]
 
-	var fr FunctionResponse
+	var fr dtypes.ContainerResponse
 	err := json.Unmarshal([]byte(jsonStr), &fr)
 
 	if err != nil {

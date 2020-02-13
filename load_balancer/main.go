@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 type NodeConfigData struct {
@@ -18,16 +19,37 @@ type NodeConfigData struct {
 var logger *log.Logger
 var sched scheduler.Scheduler
 var schedType string
+var fakeMode = false
 
 func main() {
-	if len(os.Args) != 2 {
-		println("Usage: go run *.go ll|hash|ours|pasch")
+	if len(os.Args) < 2 {
+		println("Usage: go run *.go ll|hash|ours|pasch [fakeMode=0]")
 		os.Exit(-1)
 	}
 	schedType = os.Args[1]
+	var nodes []*scheduler.Node
 
-	nodes := initNodesFromConfig("nodes.config.json")
+	if len(os.Args) > 2 {
+		intVal, err := strconv.Atoi(os.Args[2])
+		if err != nil {
+			println("Argument fakeMode should be integer (its value means number of the fake nodes)")
+			os.Exit(-1)
+		}
 
+		if intVal > 0 {
+			println("Run as fakeMode (do not send a request to the worker node), # of nodes: ", intVal)
+			fakeMode = true
+			for i := 0; i < intVal; i++ {
+				nodes = append(nodes, scheduler.NewNode(i, ""))
+			}
+			goto GuessSchedType
+		}
+	}
+	println("Load node info from `nodes.config.json`")
+	nodes = initNodesFromConfig("nodes.config.json")
+	fmt.Printf("%d nodes found\n", len(nodes))
+
+GuessSchedType:
 	switch schedType {
 	case "ll":
 		// Least Loaded Scheduler

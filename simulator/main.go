@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"time"
 )
-
-var logger *log.Logger
 
 func main() {
 	if len(os.Args) < 2 {
@@ -21,7 +20,7 @@ func main() {
 		eventStreamFileName = os.Args[2]
 	}
 
-	logger = initLogger()
+	logger := initLogger()
 
 	// Events are predetermined and described at data/events.csv
 	// Simulator run functions at specific time, using `time.Sleep` method.
@@ -31,7 +30,7 @@ func main() {
 		// StartTime will be recorded before running function & running scheduling algorithm
 		startTime := time.Now().UnixNano()
 
-		// Request function call to load balancer
+		// Request function to load balancer
 		resp, err := runFunction(lbUrl, functionName)
 		if err != nil {
 			panic(err)
@@ -41,25 +40,27 @@ func main() {
 		endTime := time.Now().UnixNano()
 		duration := (endTime - startTime) / int64(time.Millisecond)
 
-		// InternalExecutionTime is pure execution time of the user function
-		// Latency consists of Docker build time, container running time, scheduling algorithm execution time, network latency, etc.
-		latency := duration - resp.InternalExecutionTime
-
-		startType := "cold"
-		if resp.IsWarm {
-			startType = "warm"
-		}
-
-		nodeId := resp.LoadBalancingInfo.WorkerNodeId
-
-		// Print to stdout
-		fmt.Printf("%s in %dms, at node %d, %s start, latency %dms - %s\n", functionName, duration, nodeId, startType, latency, resp.Result.Body)
+		fmt.Printf("%s in %dms\n", functionName, duration)
 
 		// Log result to the file
-		logMsg := fmt.Sprintf("%d %s %s %d %d %d", nodeId, functionName, startType, startTime/int64(time.Millisecond), duration, latency)
+		logMsg := fmt.Sprintf(resp)
 		logger.Output(2, logMsg)
 	})
 
 	time.Sleep(time.Second * 20)
 }
 
+func runFunction(hostUrl string, functionName string) (string, error) {
+	resp, err := http.Get(hostUrl + "/execute?name=" + functionName)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+
+	return string(data), nil
+}
