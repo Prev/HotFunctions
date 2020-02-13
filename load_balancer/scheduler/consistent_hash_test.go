@@ -11,7 +11,7 @@ func Test_ConsistentHashing(t *testing.T) {
 		nodeList[i].Id = i
 	}
 
-	sched := NewConsistentHashingScheduler(&nodeList, 4)
+	sched := NewConsistentHashingScheduler(&nodeList, 4, 8)
 
 	var n1, n2, n3 *Node
 	var err error

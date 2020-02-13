@@ -3,13 +3,15 @@ package scheduler
 import (
 	"crypto/md5"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sort"
 )
 
 type ConsistentHashingScheduler struct {
 	Scheduler
-	virtualNodes []vNode
+	virtualNodes     []vNode
+	maxLoadThreshold uint
 }
 
 type vNode struct {
@@ -17,8 +19,9 @@ type vNode struct {
 	node    *Node
 }
 
-func NewConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int) *ConsistentHashingScheduler {
+func NewConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int, maxLoadThreshold uint) *ConsistentHashingScheduler {
 	s := ConsistentHashingScheduler{}
+	s.maxLoadThreshold = maxLoadThreshold
 	s.virtualNodes = make([]vNode, len(*nodes)*numVirtualNodes)
 
 	for i, node := range *nodes {
@@ -60,23 +63,23 @@ func (s ConsistentHashingScheduler) Select(functionName string) (*Node, error) {
 		right = 0
 	}
 
-	return s.virtualNodes[right].node, nil
+	//return s.virtualNodes[right].node, nil
 
-	// Check for the capacity
-	// i := right
-	// last := (i - 1 + n) % n
-	// for {
-	// 	if s.virtualNodes[i].node.capacity() > 0 {
-	// 		return s.virtualNodes[i].node, nil
-	// 	}
-	// 	if i == last {
-	// 		// all ring elements are visited
-	// 		break
-	// 	}
-	// 	i = (i + 1) % n
-	// }
+	// Bounded load
+	i := right
+	last := (i - 1 + n) % n
+	for {
+		if s.virtualNodes[i].node.Load <= s.maxLoadThreshold {
+			return s.virtualNodes[i].node, nil
+		}
+		if i == last {
+			// all ring elements are visited
+			break
+		}
+		i = (i + 1) % n
+	}
 
-	// return nil, errors.New("no available node found")
+	return nil, errors.New("no available node found")
 }
 
 func (s ConsistentHashingScheduler) Finished(node *Node, _ string) error {

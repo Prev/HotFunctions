@@ -61,7 +61,7 @@ GuessSchedType:
 		// Consistent Hashing Scheduler
 		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
 		println("Using Consistent Hashing Scheduler")
-		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8)
+		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8, 8)
 
 	case "pasch":
 		// Consistent Hashing Scheduler
