@@ -2,9 +2,10 @@ import math
 import json
 import sys
 import re
+from pprint import pprint
 
 if len(sys.argv) < 2:
-	print('Usage: python analyzer.py <path/to/log>')
+	print('Usage: python analyzer.py <path/to/log> [<detail_mode=0>]')
 	sys.exit(-1)
 
 def avg(datalist):
@@ -20,32 +21,23 @@ def stdd(datalist):
 	v = avg([(d - avg_n) ** 2 for d in datalist])
 	return math.sqrt(v)
 
+def percentile(num, total):
+	return '%d%%' % (num / total * 100)
+
 with open(sys.argv[1], 'r') as file:
 	log = file.readlines()
 
+DETAIL_MODE = len(sys.argv) == 3 and sys.argv[2] != '0'
 
-NUM_NODES = 8
+NUM_NODES = 10
+LOG_FORMAT = re.compile('(\S+)\s(\S+)\s(\d+)\s(\d+)\s(\S+)\s(.+)')
+std_time = math.inf
+last_time = -1
 
-# Init data structures
-ret = [{} for _ in range(0, NUM_NODES)]
-std_time = 999999999999
-
-num_warm_starts = 0
-num_cold_starts = 0
-
-durations = []
-latencies = []
-durations_per_functions = {}
-latencies_per_functions = {}
-warm_per_functions = {}
-
-warm_latencies = []
-cold_latencies = []
-
-LOG_FORMAT = re.compile('(\S+)\s(\S+)\s(\d+)\s(\d+)\s(\S+)\s(\S+)')
+records = []
 
 # Parse log
-for row in log:
+for row in log[20:]:
 	if len(row) <= 1:
 		continue
 
@@ -55,114 +47,189 @@ for row in log:
 	function_name = matches.group(5)
 	data = json.loads(matches.group(6))
 
-	# date, time, node_index, function_name, start_type, start_time, duration, latency = row.split(" ")
-	
-	start_time = int(start_time)
-	# duration = int(duration)
-	# latency = int(latency)
-	# node_index = int(node_index)
+	if 'Error' in data:
+		continue
+
+	std_time = min(std_time, start_time)
+	last_time = max(last_time, end_time)
+
+	records.append((
+		start_time,
+		end_time,
+		function_name,
+		data,
+	))
+
+
+# ret = [{} for _ in range(0, NUM_NODES)]
+max_timeslot = int((last_time - std_time) / 1000) + 1
+ret = []
+for _ in range(0, NUM_NODES):
+	arr = []
+	for _ in range(0, max_timeslot):
+		arr.append({})
+	ret.append(arr)
+
+
+# Init data structures
+durations = []
+latencies = []
+durations_per_functions = {}
+latencies_per_functions = {}
+
+num_total = 0
+
+num_image_hit = 0
+opt1_execution_times = ([], [])
+opt1_latencies = ([], [])
+
+num_using_pooled_container = 0
+opt2_execution_times = ([], [])
+opt2_latencies = ([], [])
+
+num_using_existing_rest_container = 0
+opt3_execution_times = ([], [])
+opt3_latencies = ([], [])
+
+executions_per_node = [{} for _ in range(0, NUM_NODES)]
+
+for start_time, end_time, function_name, data in records:
+	s = math.floor((start_time - std_time) / 1000)
+	e = math.ceil((end_time - std_time) / 1000)
 
 	node_id = data['LoadBalancingInfo']['WorkerNodeId']
-
-	s = math.floor(start_time / 1000)
-	e = math.ceil(end_time / 1000)
-
-	node_ret = ret[node_id]
+	
 	for i in range(s, e):
-		if i not in node_ret:
-			node_ret[i] = {}
-		
-		node_ret[i][function_name] = node_ret[i].get(function_name, 0) + 1
+		ret[node_id][i][function_name] = ret[node_id][i].get(function_name, 0) + 1
 
-	std_time = min(std_time, s)
+	duration = end_time - start_time
+	latency = duration - data['InternalExecutionTime']
 
 	if function_name not in durations_per_functions:
 		durations_per_functions[function_name] = []
 		latencies_per_functions[function_name] = []
-		warm_per_functions[function_name] = 0
-
-	# if start_type == 'warm':
-	# 	num_warm_starts += 1
-	# 	warm_per_functions[function_name] += 1
-	# 	warm_latencies.append(latency)
-	# else:
-	# 	num_cold_starts += 1
-	# 	cold_latencies.append(latency)
-
-	# duration = data['ExecutionTime']
-	duration = end_time - start_time
-	latency = data['InternalExecutionTime']
 
 	durations_per_functions[function_name].append(duration)
 	latencies_per_functions[function_name].append(latency)
 	durations.append(duration)
 	latencies.append(latency)
 
+	num_total += 1
+
+	if data['Meta']['ImageBuilt']:
+		opt1_execution_times[1].append(duration)
+		opt1_latencies[1].append(latency)
+	else:
+		num_image_hit += 1
+		opt1_execution_times[0].append(duration)
+		opt1_latencies[0].append(latency)
+
+	if data['Meta']['UsingPooledContainer']:
+		num_using_pooled_container += 1
+		opt2_execution_times[0].append(duration)
+		opt2_latencies[0].append(latency)
+	else:
+		opt2_execution_times[1].append(duration)
+		opt2_latencies[1].append(latency)
+
+	if data['Meta']['UsingExistingRestContainer']:
+		num_using_existing_rest_container += 1
+		opt3_execution_times[0].append(duration)
+		opt3_latencies[0].append(latency)
+	else:
+		opt3_execution_times[1].append(duration)
+		opt3_latencies[1].append(latency)
+
+
+	executions_per_node[node_id][function_name] = executions_per_node[node_id].get(function_name, 0) + 1
+
+print('Total:', num_total)
+for node_id, d in enumerate(executions_per_node):
+	print('Node %d | total: %d | %s' % (node_id, sum(d.values()), d))
+
+print('------------------------Locality------------------------')
 avg_num_df = []
-per_time = [0] * 26
+per_time = [{} for _ in range(0, max_timeslot)]
+
 for node_id, data in enumerate(ret):
-
 	# Sample format of `data`:
-	#   1581056653: {'W7': 1, 'T2': 1, 'W4': 2, 'W5': 2, 'D3': 1}
+	#   [{'W7': 1, 'T2': 1, 'W4': 2, 'W5': 2, 'D3': 1}, ...]
 
-	arr = [len(d.keys()) for d in data.values()]
-	# print('[Node %d] %s (avg. %.1f)' % (
-	# 	node_id,
-	# 	join2(arr),
-	# 	avg(arr)
-	# ))
+	arr = [len(d.keys()) for d in data]
+	# `arr` means number of distinct functions of the node where index is timeslot
+	# Sample format of `arr`:
+	#	[1, 2, 1, 2, 2, 3, 1, ...]
 
-	for i, d in enumerate(arr):
-		if i > 50: continue
-		per_time[int(i / 2)] += d
 	avg_num_df.append(avg(arr))
 
-# for i, d in enumerate(per_time):
-# 	print('(%d, %.2f)' % (
-# 		i*2,
-# 		d / 8 / 2,
-# 	), end=' ')
-# print('')
+	for timeslot, dic in enumerate(data):
+		per_time[timeslot][node_id] = len(dic.keys())
 
-
-print("------------------------Locality------------------------")
-print("%.1f%%" % (1 / avg(avg_num_df) * 100))
 print('# of distinct functions for each node: %.1f (stddev.: %.1f)' % (
 	avg(avg_num_df),
 	stdd(avg_num_df),
 ))
 
+if DETAIL_MODE:
+	for timeslot, row in enumerate(per_time):
+		if timeslot > 130: continue
+		print('(%d, %.1f)' % (timeslot, avg(row.values())), end=' ')
 
+	print('\n')
+
+print('\n------------------------Imbalance------------------------')
 avg_executions = []
-avg_capacities = []
+per_time = [{} for _ in range(0, max_timeslot)]
 
-for node_index, data in enumerate(ret):
-	arr = [sum(d.values()) for d in data.values()]
-	# print('[Node %d] %s (avg. %.1f)' % (
-	# 	node_index,
-	# 	join2(arr),
-	# 	avg(arr)
-	# ))
+for node_id, data in enumerate(ret):
+	arr = [sum(d.values()) for d in data]
 	avg_executions.append(avg(arr))
-	avg_capacities.append(8-avg(arr))
 
-
-print("------------------------Imbalance------------------------")
+	for timeslot, dic in enumerate(data):
+		per_time[timeslot][node_id] = sum(dic.values())
 
 print('CV: %.2f (sttdev.: %.2f, avg: %.2f)' % (
 	stdd(avg_executions) / avg(avg_executions),
 	stdd(avg_executions),
-	stdd(avg_executions),
+	avg(avg_executions),
 ))
 
+if DETAIL_MODE:
+	for timeslot, row in enumerate(per_time):
+		if timeslot > 130 or timeslot < 10: continue
+		v = row.values()
+		cv = stdd(v) / avg(v)
 
-# print('-------------------- warm/cold --------------------')
-# print('# of warm starts:', num_warm_starts)
-# print('# of cold starts:', num_cold_starts)
-# print('warm (%%): %d%%' % (num_warm_starts / (num_warm_starts + num_cold_starts) * 100))
+		print('(%d, %.2f)' % (timeslot, cv), end=' ')
+	print('')
+
+print('\n-------------------- Cache hits --------------------')
+print('                           | Hit | Miss | %  | H.E.Time | M.E.Time')
+print('ImageReuse                 | %d | %d | %s | %dms | %dms |' % (
+	num_image_hit,
+	num_total - num_image_hit,
+	percentile(num_image_hit, num_total),
+	avg(opt1_execution_times[0]),
+	avg(opt1_execution_times[1]),
+))
+print('UsingPooledContainer       | %d | %d | %s | %dms | %dms |' % (
+	num_using_pooled_container,
+	num_total - num_using_pooled_container,
+	percentile(num_using_pooled_container, num_total),
+	avg(opt2_execution_times[0]),
+	avg(opt2_execution_times[1]),
+))
+print('UsingExistingRestContainer | %d | %d | %s | %dms | %dms |' % (
+	num_using_existing_rest_container,
+	num_total - num_using_existing_rest_container,
+	percentile(num_using_existing_rest_container, num_total),
+	avg(opt3_execution_times[0]),
+	avg(opt3_execution_times[1]),
+))
+print('')
 
 
-print('-------------------- exec time / latency --------------------')
+print('-------------------- Exec time / latency --------------------')
 # for key, arr in sorted(durations_per_functions.items(), key=lambda e: e[0]):
 # 	print('[%s]: avg exec time: %dms, avg latency: %dms, warm: %d/%d' % (
 # 		key,
@@ -176,3 +243,4 @@ print('avg exec time: %dms\navg latency: %dms' % (
 	avg(durations),
 	avg(latencies),
 ))
+print('')

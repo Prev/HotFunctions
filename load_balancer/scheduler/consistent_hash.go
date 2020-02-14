@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 )
 
 type ConsistentHashingScheduler struct {
 	Scheduler
 	virtualNodes     []vNode
 	maxLoadThreshold uint
+	mutex            *sync.Mutex
 }
 
 type vNode struct {
@@ -23,6 +25,7 @@ func NewConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int, maxLoadT
 	s := ConsistentHashingScheduler{}
 	s.maxLoadThreshold = maxLoadThreshold
 	s.virtualNodes = make([]vNode, len(*nodes)*numVirtualNodes)
+	s.mutex = new(sync.Mutex)
 
 	for i, node := range *nodes {
 		for m := 0; m < numVirtualNodes; m++ {
@@ -66,10 +69,14 @@ func (s ConsistentHashingScheduler) Select(functionName string) (*Node, error) {
 	//return s.virtualNodes[right].node, nil
 
 	// Bounded load
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	i := right
 	last := (i - 1 + n) % n
 	for {
-		if s.virtualNodes[i].node.Load <= s.maxLoadThreshold {
+		if s.virtualNodes[i].node.Load < s.maxLoadThreshold {
+
+			s.virtualNodes[i].node.Load++
 			return s.virtualNodes[i].node, nil
 		}
 		if i == last {
@@ -83,6 +90,8 @@ func (s ConsistentHashingScheduler) Select(functionName string) (*Node, error) {
 }
 
 func (s ConsistentHashingScheduler) Finished(node *Node, _ string) error {
-	// Do nothing
+	s.mutex.Lock()
+	node.Load--
+	s.mutex.Unlock()
 	return nil
 }

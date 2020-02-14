@@ -11,18 +11,18 @@ func Test_ConsistentHashing(t *testing.T) {
 		nodeList[i].Id = i
 	}
 
-	sched := NewConsistentHashingScheduler(&nodeList, 4, 8)
+	sched := NewConsistentHashingScheduler(&nodeList, 4, 4)
 
-	var n1, n2, n3 *Node
+	var n1, n2, n3, n4 *Node
 	var err error
 
 	if n1, err = sched.Select("A"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sched.Select("B"); err != nil {
+	if _, err = sched.Select("B"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sched.Select("C"); err != nil {
+	if _, err = sched.Select("C"); err != nil {
 		t.Fatal(err)
 	}
 	if n2, err = sched.Select("A"); err != nil {
@@ -31,11 +31,18 @@ func Test_ConsistentHashing(t *testing.T) {
 	if n3, err = sched.Select("A"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sched.Select("A"); err != nil {
+	if _, err = sched.Select("A"); err != nil {
+		t.Fatal(err)
+	}
+	if n4, err = sched.Select("A"); err != nil {
 		t.Fatal(err)
 	}
 
 	if n1.Id != n2.Id || n1.Id != n3.Id {
 		t.Fatal("Same functions are placed different nodes")
+	}
+
+	if n4.Id == n3.Id {
+		t.Fatal("Something goes wrong on processing bounded load")
 	}
 }
