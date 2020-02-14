@@ -48,40 +48,41 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
-	message := "nothing changed"
+	oldOptions := h.functionRunner.cachingOptions
 
-	imageLimit := q["image_limit"]
-	if len(imageLimit) > 0 {
-		val, _ := strconv.Atoi(imageLimit[0])
+	if v := q["image_limit"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
 		h.functionRunner.cachingOptions.ImageLimit = val
-		message = "configure changed"
 	}
-
-	containerPoolLimit := q["container_pool_limit"]
-	if len(containerPoolLimit) > 0 {
-		val, _ := strconv.Atoi(containerPoolLimit[0])
+	if v := q["container_pool_limit"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
 		h.functionRunner.cachingOptions.ContainerPoolLimit = val
-		message = "configure changed"
 	}
-
-	containerPoolNum := q["container_pool_num"]
-	if len(containerPoolNum) > 0 {
-		val, _ := strconv.Atoi(containerPoolNum[0])
+	if v := q["container_pool_num"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
 		h.functionRunner.cachingOptions.ContainerPoolNum = val
-		message = "configure changed"
+	}
+	if v := q["using_rest_mode"]; len(v) > 0 {
+		if v[0] == "true" {
+			h.functionRunner.cachingOptions.UsingRestMode = true
+		} else if v[0] == "false" {
+			h.functionRunner.cachingOptions.UsingRestMode = false
+		}
+		h.functionRunner.images = make(map[string]Image)
+	}
+	if v := q["rest_container_life_time"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
+		h.functionRunner.cachingOptions.RestContainerLifeTime = val
 	}
 
-	usingRestMode := q["using_rest_mode"]
-	if len(usingRestMode) > 0 {
-		if usingRestMode[0] == "true" {
-			h.functionRunner.cachingOptions.UsingRestMode = true
-			message = "configure changed"
-		} else if usingRestMode[0] == "false" {
-			h.functionRunner.cachingOptions.UsingRestMode = false
-			message = "configure changed"
-		}
-
-		h.functionRunner.images = make(map[string]Image)
+	message := "nothing changed"
+	newOptions := h.functionRunner.cachingOptions
+	if oldOptions.ImageLimit != newOptions.ImageLimit ||
+		oldOptions.ContainerPoolLimit != newOptions.ContainerPoolLimit ||
+		oldOptions.ContainerPoolNum != newOptions.ContainerPoolNum ||
+		oldOptions.UsingRestMode != newOptions.UsingRestMode ||
+		oldOptions.RestContainerLifeTime != newOptions.RestContainerLifeTime {
+		message = "configure changed"
 	}
 
 	resp := ConfigureSuccessResponse{message, h.functionRunner.cachingOptions}

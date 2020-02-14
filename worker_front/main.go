@@ -17,10 +17,11 @@ var logger *log.Logger
 var UserFunctionUrlPrefix string
 
 type CachingOptions struct {
-	ImageLimit         int
-	ContainerPoolLimit int
-	ContainerPoolNum   int
-	UsingRestMode      bool
+	ImageLimit            int
+	ContainerPoolLimit    int
+	ContainerPoolNum      int
+	UsingRestMode         bool
+	RestContainerLifeTime int
 }
 
 func main() {
@@ -69,12 +70,15 @@ func runWorkerFront(port int) {
 	UserFunctionUrlPrefix = getEnvString("USER_FUNCTION_URL_PREFIX", "https://lalb-sample-functions.s3.ap-northeast-2.amazonaws.com/")
 	goMaxProcs := getEnvInt("GOMAXPROCS", 8)
 
-	imageCacheLimit := getEnvInt("IMAGE_CACHE_LIMIT", -1)
-	containerPoolLimit := getEnvInt("CONTAINER_POOL_LIMIT", -1)
-	containerPoolNum := getEnvInt("CONTAINER_POOL_NUM", 4)
-	usingRestMode := false
+	cachingOptions := CachingOptions{
+		ImageLimit:            getEnvInt("IMAGE_CACHE_LIMIT", -1),
+		ContainerPoolLimit:    getEnvInt("CONTAINER_POOL_LIMIT", -1),
+		ContainerPoolNum:      getEnvInt("CONTAINER_POOL_NUM", 4),
+		UsingRestMode:         false,
+		RestContainerLifeTime: getEnvInt("REST_CONTAINER_LIFE_TIME", 10),
+	}
 	if getEnvString("USING_REST_MODE", "") != "" {
-		usingRestMode = true
+		cachingOptions.UsingRestMode = true
 	}
 
 	runtime.GOMAXPROCS(goMaxProcs)
@@ -88,12 +92,7 @@ func runWorkerFront(port int) {
 	logger.Printf("GOMAXPROCS: %d\n", goMaxProcs)
 	logger.Printf("Server listening at :%d\n", port)
 
-	http.Handle("/", newRequestHandler(CachingOptions{
-		imageCacheLimit,
-		containerPoolLimit,
-		containerPoolNum,
-		usingRestMode,
-	}))
+	http.Handle("/", newRequestHandler(cachingOptions))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 
 	if err != nil {

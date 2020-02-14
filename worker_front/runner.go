@@ -132,6 +132,21 @@ func (r *FunctionRunner) manageCaches() {
 				clearPreWarmedContainers(&r.containers, image)
 			}
 		}
+
+		// Remove rest container based on lifetime
+		if r.cachingOptions.UsingRestMode {
+			now := time.Now().Unix()
+			lifetime := int64(r.cachingOptions.RestContainerLifeTime)
+
+			for i, container := range r.containers {
+				if now - r.lru[container.FunctionName] > lifetime {
+					logger.Printf("Container %s is removed\n", container.Name)
+					container.Remove()
+					r.containers = append((r.containers)[:i], (r.containers)[i+1:]...)
+				}
+			}
+
+		}
 	}
 }
 

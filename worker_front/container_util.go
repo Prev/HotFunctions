@@ -90,10 +90,6 @@ func CreateContainer(image Image) (Container, error) {
 	return cont, nil
 }
 
-func containerBelongsToFunction(containerName string, functionName string) bool {
-	return strings.Split(containerName, "__")[0] == "hf_" + strings.ToLower(functionName)
-}
-
 func (c Container) Run() (*dtypes.ContainerResponse, error) {
 	containerID := c.Name
 	ctx := context.Background()
@@ -162,4 +158,11 @@ func (c Container) Run() (*dtypes.ContainerResponse, error) {
 	}
 
 	return &fr, nil
+}
+
+func (c Container) Remove() {
+	ctx := context.Background()
+	if err := cli.ContainerRemove(ctx, c.Name, types.ContainerRemoveOptions{Force: true}); err != nil {
+		logger.Println(err.Error())
+	}
 }
