@@ -38,9 +38,9 @@ First argument is the port, and second argument is the option for daemon.
 Default port number is `8222`.
 
 ```bash
-$ go run *.go
-$ go run *.go 8222
-$ go run *.go 8222 -d
+$ go run *.go start
+$ go run *.go start 8222
+$ go run *.go start 8222 -d
 ```
 
 If you use daemonize option,
@@ -48,7 +48,7 @@ then you can see two files (`daemon.log`, `daemon.pid`) on the same directory.
 To kill the daemon, run command like below.
 
 ```bash
-kill `cat daemon.pid`
+$ go run *.go stop
 ```
 
 After running the worker front, you can access the worker front with visiting `http://localhost:8222`.

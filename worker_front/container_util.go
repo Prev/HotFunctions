@@ -18,7 +18,7 @@ import (
 	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 )
 
-const CPUQuota = 25000
+const CPUQuota = 0
 
 type Container struct {
 	Name           string
