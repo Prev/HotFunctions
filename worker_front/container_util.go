@@ -18,6 +18,8 @@ import (
 	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 )
 
+const CPUQuota = 25000
+
 type Container struct {
 	Name           string
 	FunctionName   string
@@ -58,6 +60,7 @@ func CreateContainer(image Image) (Container, error) {
 				},
 			},
 			&container.HostConfig{
+				Resources: container.Resources{ CPUQuota: CPUQuota },
 				PortBindings: nat.PortMap{
 					"8080/tcp": []nat.PortBinding{
 						{
@@ -79,9 +82,17 @@ func CreateContainer(image Image) (Container, error) {
 		time.Sleep(time.Second)
 
 	} else {
-		_, err := cli.ContainerCreate(ctx, &container.Config{
-			Image: image.Name,
-		}, nil, nil, containerName)
+		_, err := cli.ContainerCreate(
+			ctx,
+			&container.Config{
+				Image: image.Name,
+			},
+			&container.HostConfig{
+				Resources: container.Resources{ CPUQuota: CPUQuota },
+			},
+			nil,
+			containerName,
+		)
 		if err != nil {
 			return Container{}, err
 		}

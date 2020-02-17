@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"github.com/docker/docker/client"
 	"github.com/sevlyar/go-daemon"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 )
 
+const daemonPidName = "daemon.pid"
 var cli *client.Client
 var logger *log.Logger
 
@@ -27,41 +30,76 @@ type CachingOptions struct {
 func main() {
 	var err error
 
-	port := 8222
-	if len(os.Args) >= 2 {
-		port, err = strconv.Atoi(os.Args[1])
-		if err != nil {
-			panic(err)
-		}
+	if len(os.Args) < 2 {
+		printUsageAndExit()
 	}
 
-	if len(os.Args) >= 3 && os.Args[2] == "-d" {
-		// Run as a daemon if second argument is "-d"
-		cntxt := &daemon.Context{
-			PidFileName: "daemon.pid",
-			PidFilePerm: 0644,
-			LogFileName: "daemon.log",
-			LogFilePerm: 0640,
-			WorkDir:     "./",
-			Umask:       027,
+	switch os.Args[1] {
+	case "start":
+		port := 8222
+		if len(os.Args) >= 3 {
+			port, err = strconv.Atoi(os.Args[2])
+			if err != nil {
+				panic(err)
+			}
 		}
+		if len(os.Args) >= 4 && os.Args[3] == "-d" {
+			// Run as a daemon if second argument is "-d"
+			cntxt := &daemon.Context{
+				PidFileName: daemonPidName,
+				PidFilePerm: 0644,
+				LogFileName: "daemon.log",
+				LogFilePerm: 0640,
+				WorkDir:     "./",
+				Umask:       027,
+			}
 
-		child, err := cntxt.Reborn()
-		if err != nil {
-			log.Fatal("Unable to run: ", err)
-		}
-		if child != nil {
-			// Parent
-			println("Start worker-front as a daemon")
+			child, err := cntxt.Reborn()
+			if err != nil {
+				log.Fatal("Unable to run: ", err)
+			}
+			if child != nil {
+				// Parent
+				println("Start worker-front as a daemon")
+			} else {
+				// Child daemon
+				defer cntxt.Release()
+				runWorkerFront(port)
+			}
+
 		} else {
-			// Child daemon
-			defer cntxt.Release()
 			runWorkerFront(port)
 		}
 
-	} else {
-		runWorkerFront(port)
+	case "stop":
+		pid, err := ioutil.ReadFile(daemonPidName)
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = exec.Command("kill", string(pid)).Output()
+		if err != nil {
+			panic(err)
+		}
+
+		if err := os.Remove(daemonPidName); err != nil {
+			panic(err)
+		}
+
+		println("Daemon stopped")
+
+	default:
+		printUsageAndExit()
 	}
+}
+
+func printUsageAndExit() {
+	println("Usage: \n" +
+		"\tgo run *.go start\n" +
+		"\tgo run *.go start [port]\n" +
+		"\tgo run *.go start [port] [-d]\n" +
+		"\tgo run *.go stop")
+	os.Exit(-1)
 }
 
 func runWorkerFront(port int) {
