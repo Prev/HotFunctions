@@ -18,7 +18,7 @@ func NewLeastLoadedScheduler(nodes *[]*Node) *LeastLoadedScheduler {
 	return &s
 }
 
-func (s LeastLoadedScheduler) Select(_ string) (*Node, error) {
+func (s *LeastLoadedScheduler) Select(_ string) (*Node, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -36,7 +36,7 @@ func (s LeastLoadedScheduler) Select(_ string) (*Node, error) {
 	return selected, nil
 }
 
-func (s LeastLoadedScheduler) Finished(node *Node, _ string) error {
+func (s *LeastLoadedScheduler) Finished(node *Node, _ string) error {
 	s.mutex.Lock()
 	node.Load--
 	s.mutex.Unlock()

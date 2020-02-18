@@ -33,7 +33,7 @@ func NewOurScheduler(nodes *[]*Node, TMax uint, TOpt uint, cacheSize int) *OurSc
 	return &s
 }
 
-func (s OurScheduler) Select(functionName string) (*Node, error) {
+func (s *OurScheduler) Select(functionName string) (*Node, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -64,7 +64,7 @@ func (s OurScheduler) Select(functionName string) (*Node, error) {
 	return selected, nil
 }
 
-func (s OurScheduler) Finished(node *Node, functionName string) error {
+func (s *OurScheduler) Finished(node *Node, functionName string) error {
 	s.mutex.Lock()
 	s.running[node.Id][functionName]--
 	node.Load--
@@ -72,7 +72,7 @@ func (s OurScheduler) Finished(node *Node, functionName string) error {
 	return nil
 }
 
-func (s OurScheduler) available(node *Node, f string) bool {
+func (s *OurScheduler) available(node *Node, f string) bool {
 	if node.Load >= s.TMax {
 		// Task is overloaded
 		return false
@@ -102,7 +102,7 @@ func (s OurScheduler) available(node *Node, f string) bool {
 	}
 }
 
-func (s OurScheduler) leastLoadedAmongAvailable(functionName string, candidates *[]*Node) *Node {
+func (s *OurScheduler) leastLoadedAmongAvailable(functionName string, candidates *[]*Node) *Node {
 	var selected *Node = nil
 	for _, node := range *candidates {
 		if !s.available(node, functionName) {

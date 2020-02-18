@@ -19,7 +19,7 @@ var nodes []*scheduler.Node
 
 func main() {
 	if len(os.Args) < 2 {
-		println("Usage: go run *.go ll|hash|ours|pasch [fakeMode=0]")
+		println("Usage: go run *.go rr|ll|hash|ours|pasch [fakeMode=0]")
 		os.Exit(-1)
 	}
 	schedType = os.Args[1]
@@ -46,6 +46,10 @@ func main() {
 
 GuessSchedType:
 	switch schedType {
+	case "rr":
+		// Round Robin Scheduler
+		println("Using Round Robin Scheduler")
+		sched = scheduler.NewRoundRobinScheduler(&nodes)
 	case "ll":
 		// Least Loaded Scheduler
 		// Scheduler picks the node who has minimum executing tasks
