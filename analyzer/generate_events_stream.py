@@ -17,7 +17,7 @@ EXPERIMENTAL_TIME = 60 * 10 # 10min
 
 def random_dist(call_per_sec):
 	# call per minutes
-	total = round(call_per_sec * EXPERIMENTAL_TIME)
+	total = round(call_per_sec * EXPERIMENTAL_TIME * 4)
 
 	ret = []
 	for _ in range(total):
@@ -35,11 +35,6 @@ functions = [
 	('W7', WEBSERVER, random_dist(1)),
 	('W8', WEBSERVER, random_dist(0.2)),
 	('W9', WEBSERVER, random_dist(0.1)),
-# 	('D1', DATA_PROCESSING, [5000, 30000]),
-# 	('D2', DATA_PROCESSING, [6000, 6000, 6000]),
-# 	('D3', DATA_PROCESSING, [3000, 33000]),
-# 	('D4', DATA_PROCESSING, [5000, 20000, 30000, 40000]),
-# 	('D5', DATA_PROCESSING, [6000, 23000, 33000, 43000]),
     ('D1', DATA_PROCESSING, random_dist(0.033)),
 	('D2', DATA_PROCESSING, random_dist(0.05)),
 	('D3', DATA_PROCESSING, random_dist(0.033)),

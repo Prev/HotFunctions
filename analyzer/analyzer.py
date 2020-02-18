@@ -143,9 +143,16 @@ for start_time, end_time, function_name, data in records:
 
 	executions_per_node[node_id][function_name] = executions_per_node[node_id].get(function_name, 0) + 1
 
+
 print('Total:', num_total)
 for node_id, d in enumerate(executions_per_node):
-	print('Node %d | total: %d | %s' % (node_id, sum(d.values()), d))
+	print('Node %d | total: %d | avg: %.1f/s | %s' % (
+		node_id,
+		sum(d.values()),
+		sum(d.values()) / max_timeslot,
+		d
+	))
+
 
 print('------------------------Locality------------------------')
 avg_num_df = []
