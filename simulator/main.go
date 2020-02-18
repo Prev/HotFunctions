@@ -10,7 +10,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		println("Usage: go run *.go <lb_address> [<event_stream_file>]")
+		println("Usage: go run *.go <lb_address> [<event_stream_file>] [<log_file_name>]")
 		os.Exit(-1)
 	}
 
@@ -20,7 +20,12 @@ func main() {
 		eventStreamFileName = os.Args[2]
 	}
 
-	logger := initLogger()
+	logFileName := ""
+	if len(os.Args) >= 4 {
+		logFileName = os.Args[3]
+	}
+
+	logger := initLogger(logFileName)
 
 	// Events are predetermined and described at data/events.csv
 	// Simulator run functions at specific time, using `time.Sleep` method.

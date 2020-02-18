@@ -45,11 +45,15 @@ func startSimulation(eventStreamPath string, action func(string, int)) {
 	}
 }
 
-func initLogger() *log.Logger {
+func initLogger(fileName string) *log.Logger {
 	dirName := "logs/" + time.Now().Format("2006-01-02")
 	os.MkdirAll(dirName, 0755)
 
 	logFileName := dirName + "/" + time.Now().Format("15:04:05") + ".log"
+	if fileName != "" {
+		logFileName = fileName
+	}
+
 	outputFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		panic(err)

@@ -153,7 +153,6 @@ for node_id, d in enumerate(executions_per_node):
 		d
 	))
 
-
 print('------------------------Locality------------------------')
 avg_num_df = []
 per_time = [{} for _ in range(0, max_timeslot)]
@@ -202,6 +201,14 @@ print('CV: %.2f (sttdev.: %.2f, avg: %.2f)' % (
 ))
 
 if DETAIL_MODE:
+	print('avg load:')
+	for timeslot, row in enumerate(per_time):
+		if timeslot > 130 or timeslot < 10: continue
+		v = row.values()
+		print('(%d, %.2f)' % (timeslot,  avg(v)), end=' ')
+	print('')
+
+	print('CV:')
 	for timeslot, row in enumerate(per_time):
 		if timeslot > 130 or timeslot < 10: continue
 		v = row.values()
