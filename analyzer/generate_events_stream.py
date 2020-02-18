@@ -13,11 +13,11 @@ DATA_PROCESSING = 'data_processing'
 THIRD_PARTY = '3rd-party'
 INTERNAL_TOOLING = 'internal_tooling'
 
-EXPERIMENTAL_TIME = 60 * 10 # 10min
+EXPERIMENTAL_TIME = 60 * 5 # 10min
 
 def random_dist(call_per_sec):
 	# call per minutes
-	total = round(call_per_sec * EXPERIMENTAL_TIME * 4)
+	total = round(call_per_sec * EXPERIMENTAL_TIME)
 
 	ret = []
 	for _ in range(total):
@@ -26,11 +26,11 @@ def random_dist(call_per_sec):
 	return ret
 
 functions = [
-	('W1', WEBSERVER, random_dist(0.1)),
+	('W1', WEBSERVER, random_dist(1.1)),
 	('W2', WEBSERVER, random_dist(0.8)),
 	('W3', WEBSERVER, random_dist(0.9)),
-	('W4', WEBSERVER, random_dist(2)),
-	('W5', WEBSERVER, random_dist(3)),
+	('W4', WEBSERVER, random_dist(1)),
+	('W5', WEBSERVER, random_dist(3.5)),
 	('W6', WEBSERVER, random_dist(1.5)),
 	('W7', WEBSERVER, random_dist(1)),
 	('W8', WEBSERVER, random_dist(0.2)),
