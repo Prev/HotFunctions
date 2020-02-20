@@ -105,7 +105,7 @@ func setScheduler(newSchedType string) error {
 	case "ours":
 		// Proposing Greedy Scheduler
 		println("Using Our Scheduler")
-		sched = scheduler.NewOurScheduler(&nodes, 8, 6, 3)
+		sched = scheduler.NewOurScheduler(&nodes, 8, 5, 3)
 
 	default:
 		return errors.New("unsupported scheduler type")

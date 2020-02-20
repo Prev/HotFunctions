@@ -104,10 +104,10 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	ret := Response{}
 	if fakeMode {
 		ret.Result = types.ContainerResponseData{0, ""}
-		ret.InternalExecutionTime = 500
-		ret.ExecutionTime = 1000
+		ret.InternalExecutionTime = 1000
+		ret.ExecutionTime = 4000
 		ret.Meta = types.FunctionExecutionMetaData{false, false, false, "", ""}
-		time.Sleep(time.Second)
+		time.Sleep(4 * time.Second)
 
 	} else {
 		resp, err := http.Get(node.Url + "/execute?name=" + functionName)

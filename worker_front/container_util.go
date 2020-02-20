@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/docker/go-connections/nat"
 	"io/ioutil"
@@ -140,8 +141,15 @@ func (c Container) Run() (*dtypes.ContainerResponse, error) {
 			return nil, err
 		}
 
-		bytes, _ := ioutil.ReadAll(resp.Body)
+		bytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 		data = string(bytes)
+
+		if len(data) < 10 {
+			return nil, errors.New("rest container returns invalid result")
+		}
 	}
 
 	// Handle magic strings

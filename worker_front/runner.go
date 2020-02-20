@@ -93,6 +93,8 @@ BuildImage:
 	if err != nil {
 		// Retry the process from the image building.
 		logger.Println(err.Error(), "Retry...")
+
+		time.Sleep(100 * time.Millisecond)
 		imageExists = false
 		goto BuildImage
 	}
@@ -100,7 +102,10 @@ BuildImage:
 	meta.ContainerName = selected.Name
 	meta.ImageName = image.Name
 
+	r.mutex.Lock()
 	r.lru[functionName] = time.Now().Unix()
+	r.mutex.Unlock()
+
 	go r.manageCaches()
 	return out, meta
 }
