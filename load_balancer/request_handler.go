@@ -51,26 +51,31 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *RequestHandler) ConfigureBalancer(w *http.ResponseWriter, req *http.Request) {
-	isFirst := true
+	q := req.URL.Query()
+	if v := q["lb"]; len(v) > 0 {
+		if err := setScheduler(v[0]); err != nil {
+			println(err.Error())
+		}
+	}
 
 	(*w).Write([]byte("{"))
+	(*w).Write([]byte("\"lb\":"))
+	(*w).Write([]byte("\"" + schedType + "\""))
+	(*w).Write([]byte("\n"))
 
 	for _, node := range nodes {
+		(*w).Write([]byte(",\"" + node.Url +  "\":"))
+
 		resp, err := http.Get(node.Url + "/configure?" + req.URL.RawQuery)
 		if err != nil {
 			println(err.Error())
-			continue
-		}
+			(*w).Write([]byte("\"error\""))
 
-		if isFirst {
-			isFirst = false
 		} else {
-			(*w).Write([]byte(","))
+			bytes, _ := ioutil.ReadAll(resp.Body)
+			(*w).Write(bytes)
 		}
 
-		bytes, _ := ioutil.ReadAll(resp.Body)
-		(*w).Write([]byte("\"" + node.Url +  "\":"))
-		(*w).Write(bytes)
 		(*w).Write([]byte("\n"))
 	}
 	(*w).Write([]byte("}"))

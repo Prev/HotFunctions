@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Prev/HotFunctions/load_balancer/scheduler"
 	"io/ioutil"
@@ -45,34 +46,7 @@ func main() {
 	fmt.Printf("%d nodes found\n", len(nodes))
 
 GuessSchedType:
-	switch schedType {
-	case "rr":
-		// Round Robin Scheduler
-		println("Using Round Robin Scheduler")
-		sched = scheduler.NewRoundRobinScheduler(&nodes)
-	case "ll":
-		// Least Loaded Scheduler
-		// Scheduler picks the node who has minimum executing tasks
-		println("Using Least Loaded Scheduler")
-		sched = scheduler.NewLeastLoadedScheduler(&nodes)
-
-	case "hash":
-		// Consistent Hashing Scheduler
-		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
-		println("Using Consistent Hashing Scheduler")
-		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8, 8)
-
-	case "pasch":
-		// Consistent Hashing Scheduler
-		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
-		println("Using PASch Extended Scheduler")
-		sched = scheduler.NewPASchExtendedScheduler(&nodes, 8)
-
-	case "ours":
-		// Proposing Greedy Scheduler
-		println("Using Our Scheduler")
-		sched = scheduler.NewOurScheduler(&nodes, 8, 6, 3)
-	}
+	setScheduler(schedType)
 
 	port := 8111
 
@@ -102,4 +76,41 @@ func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 		nodes[i] = scheduler.NewNode(i, url)
 	}
 	return nodes
+}
+
+func setScheduler(newSchedType string) error {
+	switch newSchedType {
+	case "rr":
+		// Round Robin Scheduler
+		println("Using Round Robin Scheduler")
+		sched = scheduler.NewRoundRobinScheduler(&nodes)
+	case "ll":
+		// Least Loaded Scheduler
+		// Scheduler picks the node who has minimum executing tasks
+		println("Using Least Loaded Scheduler")
+		sched = scheduler.NewLeastLoadedScheduler(&nodes)
+
+	case "hash":
+		// Consistent Hashing Scheduler
+		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
+		println("Using Consistent Hashing Scheduler")
+		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8, 8)
+
+	case "pasch":
+		// Consistent Hashing Scheduler
+		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
+		println("Using PASch Extended Scheduler")
+		sched = scheduler.NewPASchExtendedScheduler(&nodes, 8)
+
+	case "ours":
+		// Proposing Greedy Scheduler
+		println("Using Our Scheduler")
+		sched = scheduler.NewOurScheduler(&nodes, 8, 6, 3)
+
+	default:
+		return errors.New("unsupported scheduler type")
+	}
+
+	schedType = newSchedType
+	return nil
 }

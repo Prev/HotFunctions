@@ -50,7 +50,9 @@ func (s *OurScheduler) Select(functionName string) (*Node, error) {
 
 	if selected == nil {
 		if selected = s.leastLoadedAmongAvailable(functionName, s.nodes); selected == nil {
-			return nil, errors.New("no available node found")
+			if selected = s.leastLoaded(s.nodes); selected == nil {
+				return nil, errors.New("no available node found")
+			}
 		}
 		// Register for future use
 		s.assigned[functionName] = append(s.assigned[functionName], selected)
@@ -108,6 +110,16 @@ func (s *OurScheduler) leastLoadedAmongAvailable(functionName string, candidates
 		if !s.available(node, functionName) {
 			continue
 		}
+		if selected == nil || node.Load < selected.Load {
+			selected = node
+		}
+	}
+	return selected
+}
+
+func (s *OurScheduler) leastLoaded(candidates *[]*Node) *Node {
+	var selected *Node = nil
+	for _, node := range *candidates {
 		if selected == nil || node.Load < selected.Load {
 			selected = node
 		}
