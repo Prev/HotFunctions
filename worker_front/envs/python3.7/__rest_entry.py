@@ -1,4 +1,4 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import subprocess
 
 class ProxyHTTPServer_RequestHandler(BaseHTTPRequestHandler):
@@ -14,7 +14,7 @@ class ProxyHTTPServer_RequestHandler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
 	server_address = ('0.0.0.0', 8080)
-	httpd = HTTPServer(server_address, ProxyHTTPServer_RequestHandler)
+	httpd = ThreadingHTTPServer(server_address, ProxyHTTPServer_RequestHandler)
 
 	print('running server at %s:%d' % server_address)
 	httpd.serve_forever()

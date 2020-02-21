@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.concurrent.Executors;
 import java.net.InetSocketAddress;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -13,7 +14,8 @@ public class Entry_HFRestServer {
     public static void main(String[] args) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
         server.createContext("/", new MyHandler());
-        server.setExecutor(null); // creates a default executor
+        server.setExecutor(Executors.newCachedThreadPool());
+        // server.setExecutor(null);
         server.start();
 
         System.out.println("Service running at 8080");
