@@ -36,7 +36,7 @@ func main() {
 		startTime := time.Now().UnixNano() / int64(time.Millisecond)
 
 		// Request function to load balancer
-		resp, err := runFunction(lbUrl, functionName)
+		resp, status, err := runFunction(lbUrl, functionName)
 		if err != nil {
 			panic(err)
 		}
@@ -44,7 +44,7 @@ func main() {
 		// Calculate times from endTime and startTime
 		endTime := time.Now().UnixNano() / int64(time.Millisecond)
 
-		fmt.Printf("%s in %dms\n", functionName, endTime - startTime)
+		fmt.Printf("%s in %dms [%s]\n", functionName, endTime - startTime, status)
 
 		// Log result to the file
 		logMsg := fmt.Sprintf("%d %d %s %s", startTime, endTime, functionName, resp)
@@ -54,17 +54,17 @@ func main() {
 	time.Sleep(time.Second * 20)
 }
 
-func runFunction(hostUrl string, functionName string) (string, error) {
+func runFunction(hostUrl string, functionName string) (string, string, error) {
 	resp, err := http.Get(hostUrl + "/execute?name=" + functionName)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	resp.Body.Close()
 
-	return string(data), nil
+	return string(data), resp.Status, nil
 }

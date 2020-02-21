@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,9 +15,9 @@ import (
 	"strings"
 	"time"
 
+	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 )
 
 const CPUQuota = 0
@@ -24,7 +25,6 @@ const CPUQuota = 0
 type Container struct {
 	Name           string
 	FunctionName   string
-	Reusable       bool
 	IsRestMode     bool
 	RestModePort   string
 }
@@ -32,26 +32,14 @@ type Container struct {
 func CreateContainer(image Image) (Container, error) {
 	ctx := context.Background()
 
-	containerName := fmt.Sprintf("%s_%s__%d_%d",
-		"hf_",
-		strings.ToLower(image.FunctionName),
-		time.Now().Unix() % 100000,
-		rand.Intn(100000),
-	)
-
-	cont := Container{
-		containerName,
-		image.FunctionName,
-		false,
-		false,
-		"",
-	}
 	if image.IsRestMode {
-		cont.Reusable = true
-		cont.IsRestMode = true
-		cont.RestModePort = strconv.Itoa(rand.Intn(1000) + 9000)
-
-		logger.Println("Start rest-mode container with port ", cont.RestModePort)
+		cont := Container{
+			fmt.Sprintf("hf_%s__rest", strings.ToLower(image.FunctionName)),
+			image.FunctionName,
+			true,
+			strconv.Itoa(RestModePortNo(image.FunctionName)),
+		}
+		logger.Printf("Start rest-mode container %s with port :%s\n", cont.Name, cont.RestModePort)
 
 		_, err := cli.ContainerCreate(ctx,
 			&container.Config{
@@ -72,17 +60,37 @@ func CreateContainer(image Image) (Container, error) {
 				},
 			},
 			nil,
-			containerName,
+			cont.Name,
 		)
 		if err != nil {
+			if strings.Contains(err.Error(), "Conflict") {
+				// Container exists
+				return cont, nil
+			}
 			return Container{}, err
 		}
-		if err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{}); err != nil {
+		if err := cli.ContainerStart(ctx, cont.Name, types.ContainerStartOptions{}); err != nil {
 			return Container{}, err
 		}
-		time.Sleep(time.Second)
+		// Booting the container takes some time
+		time.Sleep(time.Second / 2)
+
+		return cont, nil
 
 	} else {
+		containerName := fmt.Sprintf("hf_%s__%d_%d",
+			strings.ToLower(image.FunctionName),
+			time.Now().Unix() % 100000,
+			rand.Intn(100000),
+		)
+
+		cont := Container{
+			containerName,
+			image.FunctionName,
+			false,
+			"",
+		}
+
 		_, err := cli.ContainerCreate(
 			ctx,
 			&container.Config{
@@ -97,12 +105,12 @@ func CreateContainer(image Image) (Container, error) {
 		if err != nil {
 			return Container{}, err
 		}
-	}
 
-	return cont, nil
+		return cont, nil
+	}
 }
 
-func (c Container) Run() (*dtypes.ContainerResponse, error) {
+func (c *Container) Run() (*dtypes.ContainerResponse, error) {
 	containerID := c.Name
 	ctx := context.Background()
 
@@ -179,9 +187,15 @@ func (c Container) Run() (*dtypes.ContainerResponse, error) {
 	return &fr, nil
 }
 
-func (c Container) Remove() {
+func (c *Container) Remove() {
 	ctx := context.Background()
 	if err := cli.ContainerRemove(ctx, c.Name, types.ContainerRemoveOptions{Force: true}); err != nil {
 		logger.Println(err.Error())
 	}
+}
+
+func RestModePortNo(functionName string) int {
+	b := md5.Sum([]byte(functionName))
+	d := int(b[0]) + int(b[1]) + int(b[2])
+	return 9000 + (d % 1000)
 }

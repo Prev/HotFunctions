@@ -111,9 +111,9 @@ func runWorkerFront(port int) {
 	cachingOptions := CachingOptions{
 		ImageLimit:            getEnvInt("IMAGE_CACHE_LIMIT", -1),
 		ContainerPoolLimit:    getEnvInt("CONTAINER_POOL_LIMIT", -1),
-		ContainerPoolNum:      getEnvInt("CONTAINER_POOL_NUM", 4),
+		ContainerPoolNum:      getEnvInt("CONTAINER_POOL_NUM", 6),
 		UsingRestMode:         false,
-		RestContainerLifeTime: getEnvInt("REST_CONTAINER_LIFE_TIME", 10),
+		RestContainerLifeTime: getEnvInt("REST_CONTAINER_LIFE_TIME", 60),
 	}
 	if getEnvString("USING_REST_MODE", "") != "" {
 		cachingOptions.UsingRestMode = true

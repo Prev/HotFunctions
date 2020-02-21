@@ -123,6 +123,7 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 func writeFailResponse(w *http.ResponseWriter, message string) {
 	resp := FailResponse{true, message}
 	bytes, _ := json.Marshal(resp)
+	(*w).WriteHeader(500)
 	(*w).Write(bytes)
 }
 

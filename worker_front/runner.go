@@ -8,18 +8,20 @@ import (
 )
 
 type FunctionRunner struct {
-	imageBuilder         *ImageBuilder
-	cachingOptions       CachingOptions
-	lru                  map[string]int64
-	images               map[string]Image
-	containers           []Container
-	mutex                *sync.Mutex
+	imageBuilder               *ImageBuilder
+	singletonContainerManager  *SingletonContainerManager
+	cachingOptions             CachingOptions
+	lru                        map[string]int64
+	images                     map[string]Image
+	containers                 []Container
+	mutex                      *sync.Mutex
 }
 
 func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
 	r := new(FunctionRunner)
 	r.cachingOptions = cachingOptions
 	r.imageBuilder = newImageBuilder(&r.cachingOptions)
+	r.singletonContainerManager = newRestContainerManager()
 
 	r.lru = make(map[string]int64)
 	r.images = make(map[string]Image)
@@ -29,12 +31,14 @@ func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
 
 func (r *FunctionRunner) runFunction(functionName string) (*types.ContainerResponse, types.FunctionExecutionMetaData) {
 	var err error
+	tryCnt := 0
 	meta := types.FunctionExecutionMetaData{false, false, false, "", ""}
 
 	// Step1: Check for the image existence.
 	// If there is no cached image, build a new docker image
 	r.mutex.Lock()
 	image, imageExists := r.images[functionName]
+	r.lru[functionName] = time.Now().Unix()
 	r.mutex.Unlock()
 
 BuildImage:
@@ -49,29 +53,39 @@ BuildImage:
 
 	// Step2: Check for the container existence.
 	// There are two cases of using existence containers: 1) pre-warmed or 2) restful
-	// Pre-warmed containers are not reusable. They are created in background after function executions.
-
 	// Rest containers are capable to execute multiple functions concurrently in single container,
-	// so it means they are reusable, and the runner have to handle pool of containers by this "re-usability" feature
-	r.mutex.Lock()
+	// so it requires singleton pattern, where `r.singletonContainerManager` is in charge for it.
+
+SelectContainer:
 	selected := Container{}
-	for i, cont := range r.containers {
-		if cont.FunctionName == functionName {
+
+	if r.cachingOptions.UsingRestMode {
+		// RestMode
+		if cont, exists := r.singletonContainerManager.Get(image); exists {
 			selected = cont
-			if !selected.Reusable {
-				// If the container is not reusable, remove it from the list
-				r.containers = append(r.containers[:i], r.containers[i+1:]...)
+			meta.UsingExistingRestContainer = true
+
+		} else {
+			selected, err = r.singletonContainerManager.SafeCreate(image)
+			if err != nil {
+				return nil, meta
 			}
-			// Record meta data
-			if selected.IsRestMode {
-				meta.UsingExistingRestContainer = true
-			} else {
-				meta.UsingPooledContainer = true
-			}
-			break
 		}
+
+	} else {
+		// Pre-warmed container pool
+		r.mutex.Lock()
+		for i, cont := range r.containers {
+			if cont.FunctionName == functionName {
+				selected = cont
+				// Since container is not reusable, remove it from the list
+				r.containers = append(r.containers[:i], r.containers[i+1:]...)
+				meta.UsingPooledContainer = true
+				break
+			}
+		}
+		r.mutex.Unlock()
 	}
-	r.mutex.Unlock()
 
 	if selected.Name == "" {
 		// If there is no container can be used directly, create a new container
@@ -80,23 +94,34 @@ BuildImage:
 			logger.Println(err.Error())
 			return nil, meta
 		}
-
-		if selected.Reusable {
-			// If container is reusable, register to the container pool.
-			r.mutex.Lock()
-			r.containers = append(r.containers, selected)
-			r.mutex.Unlock()
-		}
 	}
 
 	out, err := selected.Run()
 	if err != nil {
-		// Retry the process from the image building.
-		logger.Println(err.Error(), "Retry...")
+		tryCnt++
+		if tryCnt > 5 {
+			return nil, meta
+		}
 
-		time.Sleep(100 * time.Millisecond)
-		imageExists = false
-		goto BuildImage
+		// Retry the process from the image building or selecting the container
+		logger.Println("Error:", err.Error(), "Retry...", tryCnt)
+
+		if selected.IsRestMode {
+			//if strings.Contains(err.Error(), "tcp") {
+			//	selected.Remove()
+			//	goto SelectContainer
+			//} else {
+			//	time.Sleep(100 * time.Millisecond)
+			//	goto RunContainer
+			//}
+			time.Sleep(300 * time.Millisecond)
+			goto SelectContainer
+
+		} else {
+			time.Sleep(100 * time.Millisecond)
+			imageExists = false
+			goto BuildImage
+		}
 	}
 
 	meta.ContainerName = selected.Name
@@ -143,11 +168,11 @@ func (r *FunctionRunner) manageCaches() {
 			now := time.Now().Unix()
 			lifetime := int64(r.cachingOptions.RestContainerLifeTime)
 
-			for i, container := range r.containers {
+			for _, container := range r.singletonContainerManager.containers {
 				if now - r.lru[container.FunctionName] > lifetime {
 					logger.Printf("Container %s is removed\n", container.Name)
 					container.Remove()
-					r.containers = append((r.containers)[:i], (r.containers)[i+1:]...)
+					r.singletonContainerManager.Delete(container.FunctionName)
 				}
 			}
 
