@@ -1,0 +1,177 @@
+<html>
+<body>
+	<style>
+		body {
+			background-color: #eee;
+			overflow: scroll;
+		}
+		#container {
+			position: relative;
+			margin: 30px auto;
+			font-size: 12px;
+		}
+
+		.axis-wrap {
+			position: relative;
+			top: -33px;
+			color: #999;
+		}
+
+		.node {
+			position: relative;
+			padding: 10px;
+			/* border: 1px solid black; */
+			height: 200px;
+			margin: 50px 0;
+			box-sizing: border-box;
+			background-color: #fff;
+		}
+
+		.node h3 {
+			position: relative;
+			top: -45px;
+			left: -10px;
+		}
+
+		.node .box {
+			position: absolute;
+			padding: 1px;
+			box-sizing: border-box;
+			border: 1px solid black;
+		}
+
+		.node .line {
+			position: absolute;
+			width: 3000px;
+			border-top: 1px solid #ccc;
+		}
+
+		.box.cold{ background: #b9b9b9; ; }
+		.box.type-T { background-color: #e0e0e0; }
+		.box.type-D { background-color: #ccc; }
+		.box.type-B { background-color: #bbb; }
+
+		.axis {
+			position: absolute;
+			top: 5px;
+		}
+	</style>
+	
+	<div id="file-area">
+		<input id="file-input" type="file" onChange="fileOnChange()">
+		<script>
+			function fileOnChange() {
+				var file = document.getElementById('file-input').files[0];
+				if (file) {
+					var reader = new FileReader();
+					reader.readAsText(file, 'UTF-8');
+					reader.onload = function (event) {
+						draw(event.target.result);
+					}
+					reader.onerror = function (event) {
+						console.error(event);
+					}
+				}
+			}
+		</script>
+	</div>
+	<div id="container"></div>
+
+
+	<script>
+		const WIDTH_OVER_MSEC = 0.05;
+		const HEIGHT = 25;
+		const NUM_NODES = 10;
+		const NODE_CAPACITY = 8;
+		
+		function draw(log) {
+			let htmls = [];
+			for (let i = 0; i < NUM_NODES; i++) {
+				htmls[i] = `<h3>Node ${i}</h3>`;
+			}
+			
+			var stdTime = -1;
+			var localOffsets = [];
+			var totalWidth = 0;
+
+			for (let i = 0; i < NUM_NODES; i++) {
+				var arr = [];
+				for (let j = 0; j < NODE_CAPACITY; j++) {
+					arr.push(0);
+				}
+				localOffsets.push(arr)
+			}
+
+			log.split("\n").forEach(e => {
+				const splitted = e.split(' ');
+				if (splitted.length < 3) {
+					return;
+				}
+
+				const startTime = parseInt(splitted[2]);
+				const endTime = parseInt(splitted[3]);
+				const appName = splitted[4];
+				let nodeIndex;
+
+				try {
+					nodeIndex = parseInt(e.split('"WorkerNodeId":')[1].split(',')[0]);
+				} catch (e) {
+					return;
+				}
+
+				if (stdTime == -1) {
+					stdTime = startTime;
+				}
+
+				const left = (startTime - stdTime) * WIDTH_OVER_MSEC + 5;
+				const width = (endTime - startTime) * WIDTH_OVER_MSEC;
+				
+				totalWidth = Math.max(totalWidth, left + width);
+
+				var localOffset = -1;
+				for (let j = 0; j < localOffsets[nodeIndex].length; j++) {
+					if (localOffsets[nodeIndex][j] <= startTime) {
+						localOffsets[nodeIndex][j] = endTime;
+						localOffset = j;
+						break;
+					}
+				}
+				const top = localOffset * HEIGHT + 5;
+
+				htmls[nodeIndex] += `
+				<div class="box"
+					 style="left: ${left}px; top: ${top}px; width: ${width}px">
+					<span>${appName}</span></sub>
+				</div>`;
+
+			});
+			
+			let finalHtml = '';
+
+			let axisHtml = `<div class="axis-wrap">`;
+			for (let x = WIDTH_OVER_MSEC * 1000; x <= totalWidth; x += WIDTH_OVER_MSEC * 1000) {
+				const k = x / WIDTH_OVER_MSEC / 1000;
+				axisHtml += `<div class="axis" style="left: ${x}px">${k}s</div>`;
+			}
+			axisHtml += `</div>`;
+
+			for (let i = 0; i < NUM_NODES; i++) {
+				const height = NODE_CAPACITY * HEIGHT + 10;
+				
+				let lines = '';
+				for (let j = 1; j < NODE_CAPACITY; j++)
+					lines += `<div class="line" style="top: ${j * HEIGHT + 5}; width: ${totalWidth}"></div>`;
+
+				finalHtml += `<div id="node${i}" class="node" style="height: ${height}; width: ${totalWidth}">
+					${axisHtml}
+					${lines}
+					${htmls[i]}
+				</div>`;
+
+				// document.getElementById('node' + i).innerHTML += htmls[i];
+			}
+			document.getElementById('container').innerHTML = finalHtml;
+		}
+	</script>
+</body>
+</html>

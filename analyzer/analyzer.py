@@ -37,7 +37,7 @@ last_time = -1
 records = []
 
 # Parse log
-for row in log[20:]:
+for row in log[20:-20]:
 	if len(row) <= 1:
 		continue
 
@@ -143,15 +143,15 @@ for start_time, end_time, function_name, data in records:
 
 	executions_per_node[node_id][function_name] = executions_per_node[node_id].get(function_name, 0) + 1
 
-
-print('Total:', num_total)
-for node_id, d in enumerate(executions_per_node):
-	print('Node %d | total: %d | avg: %.1f/s | %s' % (
-		node_id,
-		sum(d.values()),
-		sum(d.values()) / max_timeslot,
-		d
-	))
+if DETAIL_MODE:
+	print('Total:', num_total)
+	for node_id, d in enumerate(executions_per_node):
+		print('Node %d | total: %d | avg: %.1f/s | %s' % (
+			node_id,
+			sum(d.values()),
+			sum(d.values()) / max_timeslot,
+			d
+		))
 
 print('------------------------Locality------------------------')
 avg_num_df = []
@@ -178,7 +178,7 @@ print('# of distinct functions for each node: %.1f (stddev.: %.1f)' % (
 
 if DETAIL_MODE:
 	for timeslot, row in enumerate(per_time):
-		if timeslot > 130: continue
+		if timeslot > 300: continue
 		print('(%d, %.1f)' % (timeslot, avg(row.values())), end=' ')
 
 	print('\n')
@@ -201,18 +201,18 @@ print('CV: %.2f (sttdev.: %.2f, avg: %.2f)' % (
 ))
 
 if DETAIL_MODE:
-	print('avg load:')
-	for timeslot, row in enumerate(per_time):
-		if timeslot > 130 or timeslot < 10: continue
-		v = row.values()
-		print('(%d, %.2f)' % (timeslot,  avg(v)), end=' ')
-	print('')
+	# print('avg load:')
+	# for timeslot, row in enumerate(per_time):
+	# 	if timeslot > 300 or timeslot < 10: continue
+	# 	v = row.values()
+	# 	print('(%d, %.2f)' % (timeslot,  avg(v)), end=' ')
+	# print('')
 
 	print('CV:')
 	for timeslot, row in enumerate(per_time):
-		if timeslot > 130 or timeslot < 10: continue
+		if timeslot > 300 or timeslot < 10: continue
 		v = row.values()
-		cv = stdd(v) / avg(v)
+		cv = stdd(v) / avg(v) if avg(v) != 0 else 0
 
 		print('(%d, %.2f)' % (timeslot, cv), end=' ')
 	print('')
@@ -244,17 +244,25 @@ print('')
 
 
 print('-------------------- Exec time / latency --------------------')
-# for key, arr in sorted(durations_per_functions.items(), key=lambda e: e[0]):
-# 	print('[%s]: avg exec time: %dms, avg latency: %dms, warm: %d/%d' % (
-# 		key,
-# 		avg(arr),
-# 		avg(latencies_per_functions[key]),
-# 		warm_per_functions[key],
-# 		len(latencies_per_functions[key]),
-# 	))
 
 print('avg exec time: %dms\navg latency: %dms' % (
 	avg(durations),
 	avg(latencies),
 ))
 print('')
+
+
+print('Total executions:', num_total)
+functions = sorted(durations_per_functions.keys())
+for fname in functions:
+	cnt = len(durations_per_functions[fname])
+	dur = avg(durations_per_functions[fname])
+	latency = avg(latencies_per_functions[fname])
+
+	print('%s: %dms (n=%d)(internal: %dms, latency: %dms)' % (
+		fname,
+		dur,
+		cnt,
+		dur - latency,
+		latency,
+	))

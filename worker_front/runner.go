@@ -99,7 +99,7 @@ SelectContainer:
 	out, err := selected.Run()
 	if err != nil {
 		tryCnt++
-		if tryCnt > 5 {
+		if tryCnt > 30 {
 			return nil, meta
 		}
 
@@ -114,7 +114,7 @@ SelectContainer:
 			//	time.Sleep(100 * time.Millisecond)
 			//	goto RunContainer
 			//}
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			goto SelectContainer
 
 		} else {

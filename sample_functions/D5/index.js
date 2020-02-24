@@ -8,7 +8,7 @@ exports.handle = async (event, context) => {
 	let sum = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 	for (let k = 0; k < 60; k++) {
-		for (let i = 0; i < 2000 * 1000; i++) {
+		for (let i = 0; i < 2000 * 500; i++) {
 			sum[k%8] += Math.random();
 		}
 		await sleep(1500);
