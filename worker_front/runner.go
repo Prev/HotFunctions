@@ -99,7 +99,7 @@ SelectContainer:
 	out, err := selected.Run()
 	if err != nil {
 		tryCnt++
-		if tryCnt > 30 {
+		if tryCnt > 50 {
 			return nil, meta
 		}
 
@@ -114,11 +114,11 @@ SelectContainer:
 			//	time.Sleep(100 * time.Millisecond)
 			//	goto RunContainer
 			//}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			goto SelectContainer
 
 		} else {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			imageExists = false
 			goto BuildImage
 		}
