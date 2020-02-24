@@ -144,6 +144,10 @@ func (c *Container) Run() (*dtypes.ContainerResponse, error) {
 		data = buf.String()
 
 	} else {
+		if c.RestModePort == "" {
+			return nil, errors.New("container is removed")
+		}
+
 		resp, err := http.Get("http://localhost:" + c.RestModePort)
 		if err != nil {
 			return nil, err
@@ -191,6 +195,22 @@ func (c *Container) Remove() {
 	ctx := context.Background()
 	if err := cli.ContainerRemove(ctx, c.Name, types.ContainerRemoveOptions{Force: true}); err != nil {
 		logger.Println(err.Error())
+	}
+
+	if c.IsRestMode {
+		c.RestModePort = ""
+	}
+}
+
+func CleanContainers() {
+	ctx := context.Background()
+
+	containers, _ := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	for _, c := range containers {
+		if c.Image[0:3] == "hf_" {
+			logger.Println("Remove existing container", c.Names[0])
+			cli.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
+		}
 	}
 }
 

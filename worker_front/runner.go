@@ -25,8 +25,17 @@ func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
 
 	r.lru = make(map[string]int64)
 	r.images = make(map[string]Image)
+	r.containers = make([]Container, 0)
 	r.mutex = new(sync.Mutex)
 	return r
+}
+
+func (r *FunctionRunner) reset() {
+	CleanContainers()
+	r.lru = make(map[string]int64)
+	r.images = make(map[string]Image)
+	r.containers = make([]Container, 0)
+	r.singletonContainerManager = newRestContainerManager()
 }
 
 func (r *FunctionRunner) runFunction(functionName string) (*types.ContainerResponse, types.FunctionExecutionMetaData) {
@@ -114,11 +123,11 @@ SelectContainer:
 			//	time.Sleep(100 * time.Millisecond)
 			//	goto RunContainer
 			//}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			goto SelectContainer
 
 		} else {
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			imageExists = false
 			goto BuildImage
 		}

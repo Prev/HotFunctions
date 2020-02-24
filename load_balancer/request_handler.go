@@ -42,12 +42,25 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.URL.Path {
 	case "/configure":
 		h.ConfigureBalancer(&w, req)
+	case "/clear":
+		h.Clear(&w, req)
 	case "/execute":
 		h.ExecFunction(&w, req)
 	default:
 		w.WriteHeader(404)
 		writeFailResponse(&w, "404 Not found on given path")
 	}
+}
+
+func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
+	for _, node := range nodes {
+		_, err := http.Get(node.Url + "/clear")
+		if err != nil {
+			println(err.Error())
+			(*w).Write([]byte("\"error\""))
+		}
+	}
+	(*w).Write([]byte("done"))
 }
 
 func (h *RequestHandler) ConfigureBalancer(w *http.ResponseWriter, req *http.Request) {

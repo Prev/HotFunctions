@@ -130,6 +130,9 @@ func runWorkerFront(port int) {
 	logger.Printf("GOMAXPROCS: %d\n", goMaxProcs)
 	logger.Printf("Server listening at :%d\n", port)
 
+	// Clean containers before running
+	CleanContainers()
+
 	http.Handle("/", newRequestHandler(cachingOptions))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 

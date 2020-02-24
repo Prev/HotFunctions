@@ -38,6 +38,8 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.URL.Path {
 	case "/configure":
 		h.ConfigureWorker(&w, req)
+	case "/clear":
+		h.Clear(&w, req)
 	case "/execute":
 		h.ExecFunction(&w, req)
 	default:
@@ -88,6 +90,11 @@ func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Reque
 	resp := ConfigureSuccessResponse{message, h.functionRunner.cachingOptions}
 	bytes, _ := json.Marshal(resp)
 	(*w).Write(bytes)
+}
+
+func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
+	h.functionRunner.reset()
+	(*w).Write([]byte("done"))
 }
 
 func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request) {
