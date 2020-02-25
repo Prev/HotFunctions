@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -47,7 +48,8 @@ func (r *FunctionRunner) runFunction(functionName string) (*types.ContainerRespo
 	// If there is no cached image, build a new docker image
 	r.mutex.Lock()
 	image, imageExists := r.images[functionName]
-	r.lru[functionName] = time.Now().Unix()
+	// Set lru as maximum value while running
+	r.lru[functionName] = math.MaxInt64
 	r.mutex.Unlock()
 
 BuildImage:

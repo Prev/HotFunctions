@@ -15,6 +15,12 @@ func main() {
 	}
 
 	lbUrl := os.Args[1]
+
+	_, err := http.Get(lbUrl + "/clear")
+	if err != nil {
+		panic(err)
+	}
+
 	eventStreamFileName := "data/events.csv"
 	if len(os.Args) >= 3 {
 		eventStreamFileName = os.Args[2]
@@ -51,7 +57,7 @@ func main() {
 		logger.Output(2, logMsg)
 	})
 
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 60)
 }
 
 func runFunction(hostUrl string, functionName string) (string, string, error) {
