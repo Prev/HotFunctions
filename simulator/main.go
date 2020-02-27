@@ -50,7 +50,7 @@ func main() {
 		// Calculate times from endTime and startTime
 		endTime := time.Now().UnixNano() / int64(time.Millisecond)
 
-		fmt.Printf("%s in %dms [%s]\n", functionName, endTime - startTime, status)
+		fmt.Printf("(%ds) %s in %dms [%s]\n", virtualTime/1000, functionName, endTime-startTime, status)
 
 		// Log result to the file
 		logMsg := fmt.Sprintf("%d %d %s %s", startTime, endTime, functionName, resp)
