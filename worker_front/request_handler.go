@@ -52,9 +52,9 @@ func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Reque
 	q := req.URL.Query()
 	oldOptions := h.functionRunner.cachingOptions
 
-	if v := q["image_limit"]; len(v) > 0 {
-		val, _ := strconv.Atoi(v[0])
-		h.functionRunner.cachingOptions.ImageLimit = val
+	if v := q["user_code_size_limit"]; len(v) > 0 {
+		val, _ := strconv.ParseInt(v[0], 10, 64)
+		h.functionRunner.cachingOptions.UserCodeSizeLimit = val
 	}
 	if v := q["container_pool_limit"]; len(v) > 0 {
 		val, _ := strconv.Atoi(v[0])
@@ -79,7 +79,7 @@ func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Reque
 
 	message := "nothing changed"
 	newOptions := h.functionRunner.cachingOptions
-	if oldOptions.ImageLimit != newOptions.ImageLimit ||
+	if oldOptions.UserCodeSizeLimit != newOptions.UserCodeSizeLimit ||
 		oldOptions.ContainerPoolLimit != newOptions.ContainerPoolLimit ||
 		oldOptions.ContainerPoolNum != newOptions.ContainerPoolNum ||
 		oldOptions.UsingRestMode != newOptions.UsingRestMode ||

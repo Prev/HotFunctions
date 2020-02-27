@@ -150,21 +150,42 @@ func (r *FunctionRunner) manageCaches() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	for i, functionName := range sortMapByValue(&r.lru) {
-		// Check for the image cache limit
-		// If the limit is set -1, the is no limitation
-		if r.cachingOptions.ImageLimit != -1 && i >= r.cachingOptions.ImageLimit {
-			if _, exists := r.images[functionName]; exists {
-				if err := r.imageBuilder.RemoveImage(functionName); err != nil {
-					logger.Println(err.Error())
-				}
-				delete(r.images, functionName)
+	// Check for the user code size limit
+	// If the limit is set -1, the is no limitation
+	if r.cachingOptions.UserCodeSizeLimit != -1 {
+		totalCodeSize := int64(0)
+
+		// Get total downloaded code size
+		for _, functionName := range sortMapByValue(&r.lru, true) {
+			if img, exists := r.images[functionName]; exists {
+				totalCodeSize += img.Size
 			}
 		}
 
-		// Check for the container pooling
-		// If the limit is set -1, do not use the feature
-		if r.cachingOptions.ContainerPoolLimit != -1 {
+		// Remove from older images
+		for _, functionName := range sortMapByValue(&r.lru, true) {
+			if img, exists := r.images[functionName]; exists {
+				if totalCodeSize > r.cachingOptions.UserCodeSizeLimit {
+					if err := r.imageBuilder.RemoveImage(functionName); err != nil {
+						logger.Println(err.Error())
+					}
+
+					logger.Printf("Image %s is removed (%.1fMB, limit: %.1fMB)\n",
+						img.Name,
+						float64(img.Size) / 1000000,
+						float64(r.cachingOptions.UserCodeSizeLimit) / 1000000,
+					)
+					delete(r.images, functionName)
+					totalCodeSize -= img.Size
+				}
+			}
+		}
+	}
+
+	// Check for the container pooling
+	// If the limit is set -1, do not use the feature
+	if r.cachingOptions.ContainerPoolLimit != -1 {
+		for i, functionName := range sortMapByValue(&r.lru, false) {
 			image := r.images[functionName]
 			if i < r.cachingOptions.ContainerPoolLimit {
 				createPreWarmedContainers(&r.containers, image, r.cachingOptions.ContainerPoolNum)
@@ -173,20 +194,19 @@ func (r *FunctionRunner) manageCaches() {
 				clearPreWarmedContainers(&r.containers, image)
 			}
 		}
+	}
 
-		// Remove rest container based on lifetime
-		if r.cachingOptions.UsingRestMode {
-			now := time.Now().Unix()
-			lifetime := int64(r.cachingOptions.RestContainerLifeTime)
+	// Remove rest container based on lifetime
+	if r.cachingOptions.UsingRestMode {
+		now := time.Now().Unix()
+		lifetime := int64(r.cachingOptions.RestContainerLifeTime)
 
-			for _, container := range r.singletonContainerManager.containers {
-				if now - r.lru[container.FunctionName] > lifetime {
-					logger.Printf("Container %s is removed\n", container.Name)
-					container.Remove()
-					r.singletonContainerManager.Delete(container.FunctionName)
-				}
+		for _, container := range r.singletonContainerManager.containers {
+			if now - r.lru[container.FunctionName] > lifetime {
+				logger.Printf("Container %s is removed\n", container.Name)
+				container.Remove()
+				r.singletonContainerManager.Delete(container.FunctionName)
 			}
-
 		}
 	}
 }

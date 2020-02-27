@@ -20,7 +20,7 @@ var logger *log.Logger
 var UserFunctionUrlPrefix string
 
 type CachingOptions struct {
-	ImageLimit            int
+	UserCodeSizeLimit     int64
 	ContainerPoolLimit    int
 	ContainerPoolNum      int
 	UsingRestMode         bool
@@ -109,11 +109,11 @@ func runWorkerFront(port int) {
 	goMaxProcs := getEnvInt("GOMAXPROCS", 8)
 
 	cachingOptions := CachingOptions{
-		ImageLimit:            getEnvInt("IMAGE_CACHE_LIMIT", -1),
+		UserCodeSizeLimit:     getEnvInt64("USER_CODE_SIZE_LIMIT", -1),
 		ContainerPoolLimit:    getEnvInt("CONTAINER_POOL_LIMIT", -1),
 		ContainerPoolNum:      getEnvInt("CONTAINER_POOL_NUM", 6),
 		UsingRestMode:         false,
-		RestContainerLifeTime: getEnvInt("REST_CONTAINER_LIFE_TIME", 60),
+		RestContainerLifeTime: getEnvInt("REST_CONTAINER_LIFE_TIME", 10),
 	}
 	if getEnvString("USING_REST_MODE", "") != "" {
 		cachingOptions.UsingRestMode = true

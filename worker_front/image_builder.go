@@ -37,6 +37,7 @@ type Image struct {
 	Name         string
 	FunctionName string
 	IsRestMode   bool
+	Size         int64
 }
 
 func (b *ImageBuilder) BuildSafe(functionName string) (Image, error) {
@@ -71,10 +72,14 @@ func (b *ImageBuilder) BuildSafe(functionName string) (Image, error) {
 		logger.Printf("Image for function '%s' build fin.\n", functionName)
 	}
 
+	fi, _ := os.Stat(b.DownloadPathPrefix + functionName + ".tar")
+	size := fi.Size()
+
 	return Image{
 		b.imageTagName(functionName),
 		functionName,
 		b.cachingOptions.UsingRestMode,
+		size,
 	}, nil
 }
 
@@ -102,10 +107,14 @@ func (b *ImageBuilder) Build(functionName string) (Image, error) {
 		return Image{}, err
 	}
 
+	fi, _ := os.Stat(tarPath)
+	size := fi.Size()
+
 	return Image{
 		b.imageTagName(functionName),
 		functionName,
 		b.cachingOptions.UsingRestMode,
+		size,
 	}, nil
 }
 
@@ -194,6 +203,9 @@ func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string,
 		return "", err
 	}
 
+	// Remove directory
+	os.RemoveAll(functionPath)
+
 	return tarFilePath, nil
 }
 
@@ -233,6 +245,9 @@ func (b *ImageBuilder) buildImageWithTar(functionName string, tarPath string) er
 func (b *ImageBuilder) RemoveImage(functionName string) error {
 	ctx := context.Background()
 	_, err := cli.ImageRemove(ctx, b.imageTagName(functionName), types.ImageRemoveOptions{Force: true})
+
+	// Remove tar file
+	os.RemoveAll(b.DownloadPathPrefix + functionName + ".tar")
 	return err
 }
 

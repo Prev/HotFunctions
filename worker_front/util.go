@@ -11,7 +11,7 @@ type pair struct {
 	key string
 }
 
-func sortMapByValue(mapObject *map[string]int64) []string {
+func sortMapByValue(mapObject *map[string]int64, reversed bool) []string {
 	n := len(*mapObject)
 	tmp := make([]pair, 0, n)
 
@@ -19,7 +19,11 @@ func sortMapByValue(mapObject *map[string]int64) []string {
 		tmp = append(tmp, pair{val, key})
 	}
 	sort.Slice(tmp, func (i, j int) bool {
-		return tmp[i].value > tmp[j].value
+		if reversed {
+			return tmp[i].value < tmp[j].value
+		} else {
+			return tmp[i].value > tmp[j].value
+		}
 	})
 
 	ret := make([]string, n)
@@ -29,10 +33,18 @@ func sortMapByValue(mapObject *map[string]int64) []string {
 	return ret
 }
 
-
 func getEnvInt(key string, fallback int) int {
 	if value, ok := os.LookupEnv(key); ok {
 		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+	}
+	return fallback
+}
+
+func getEnvInt64(key string, fallback int64) int64 {
+	if value, ok := os.LookupEnv(key); ok {
+		if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
 			return intVal
 		}
 	}
