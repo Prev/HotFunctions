@@ -44,6 +44,8 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		h.ConfigureBalancer(&w, req)
 	case "/clear":
 		h.Clear(&w, req)
+	case "/prepare":
+		h.Prepare(&w, req)
 	case "/execute":
 		h.ExecFunction(&w, req)
 	default:
@@ -55,6 +57,17 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
 	for _, node := range nodes {
 		_, err := http.Get(node.Url + "/clear")
+		if err != nil {
+			println(err.Error())
+			(*w).Write([]byte("\"error\""))
+		}
+	}
+	(*w).Write([]byte("done"))
+}
+
+func (h *RequestHandler) Prepare(w *http.ResponseWriter, req *http.Request) {
+	for _, node := range nodes {
+		_, err := http.Get(node.Url + "/prepare")
 		if err != nil {
 			println(err.Error())
 			(*w).Write([]byte("\"error\""))
