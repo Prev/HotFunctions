@@ -40,6 +40,8 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		h.ConfigureWorker(&w, req)
 	case "/clear":
 		h.Clear(&w, req)
+	case "/prepare":
+		h.Prepare(&w, req)
 	case "/execute":
 		h.ExecFunction(&w, req)
 	default:
@@ -93,8 +95,25 @@ func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Reque
 }
 
 func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
-	h.functionRunner.reset()
-	(*w).Write([]byte("done"))
+	q := req.URL.Query()
+	if v := q["reset_images"]; len(v) > 0 {
+		if v[0] == "true" {
+			h.functionRunner.Reset(true)
+			(*w).Write([]byte("done; reset_images=true"))
+			return
+		}
+	}
+	h.functionRunner.Reset(false)
+	(*w).Write([]byte("done; reset_images=false"))
+}
+
+func (h *RequestHandler) Prepare(w *http.ResponseWriter, req *http.Request) {
+	err := h.functionRunner.PrepareImages()
+	if err != nil {
+		(*w).Write([]byte(err.Error()))
+	} else {
+		(*w).Write([]byte("done"))
+	}
 }
 
 func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request) {
@@ -108,7 +127,7 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	startTime := makeTimestamp()
 
 	functionName := nameParam[0]
-	out, meta := h.functionRunner.runFunction(functionName)
+	out, meta := h.functionRunner.RunFunction(functionName)
 	if out == nil {
 		writeFailResponse(w, "error on running a function")
 		return

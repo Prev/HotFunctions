@@ -1,11 +1,14 @@
 package main
 
 import (
+	"io/ioutil"
 	"math"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/Prev/HotFunctions/worker_front/types"
+	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 )
 
 type FunctionRunner struct {
@@ -31,18 +34,53 @@ func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
 	return r
 }
 
-func (r *FunctionRunner) reset() {
-	CleanContainers()
-	r.lru = make(map[string]int64)
-	r.images = make(map[string]Image)
-	r.containers = make([]Container, 0)
-	r.singletonContainerManager = newRestContainerManager()
+// Prepare all images of sample functions
+// [Notice] It may takes long time, so call it carefully
+func (r *FunctionRunner) PrepareImages() error {
+	resp, err := http.Get(UserFunctionUrlPrefix + "lists.txt")
+	if err != nil {
+		return err
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	lists := strings.Split(string(data), "\n")
+	logger.Println("Build image", strings.Join(lists, ","))
+
+	for _, functionName := range lists {
+		image, err := r.imageBuilder.BuildSafe(functionName)
+		if err != nil {
+			logger.Println(err.Error())
+		}
+		r.images[functionName] = image
+	}
+	return nil
 }
 
-func (r *FunctionRunner) runFunction(functionName string) (*types.ContainerResponse, types.FunctionExecutionMetaData) {
+func (r *FunctionRunner) Reset(resetImages bool) {
+	CleanContainers()
+	r.lru = make(map[string]int64)
+	r.containers = make([]Container, 0)
+	r.singletonContainerManager = newRestContainerManager()
+
+	if resetImages {
+		r.images = make(map[string]Image)
+	}
+}
+
+func (r *FunctionRunner) RunFunction(functionName string) (*dtypes.ContainerResponse, dtypes.FunctionExecutionMetaData) {
 	var err error
 	tryCnt := 0
-	meta := types.FunctionExecutionMetaData{false, false, false, "", ""}
+	meta := dtypes.FunctionExecutionMetaData{
+		ImageBuilt: false,
+		UsingPooledContainer: false,
+		UsingExistingRestContainer: false,
+		ContainerName: "",
+		ImageName: "",
+	}
 
 	// Step1: Check for the image existence.
 	// If there is no cached image, build a new docker image
@@ -118,13 +156,6 @@ SelectContainer:
 		logger.Println("Error:", err.Error(), "Retry...", tryCnt)
 
 		if selected.IsRestMode {
-			//if strings.Contains(err.Error(), "tcp") {
-			//	selected.Remove()
-			//	goto SelectContainer
-			//} else {
-			//	time.Sleep(100 * time.Millisecond)
-			//	goto RunContainer
-			//}
 			time.Sleep(100 * time.Millisecond)
 			goto SelectContainer
 
