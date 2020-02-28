@@ -59,15 +59,15 @@ func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
 	wg := sync.WaitGroup{}
 	for _, node := range nodes {
 		wg.Add(1)
-		go func() {
+		go func(nodeUrl string) {
 			defer wg.Done()
 
-			_, err := http.Get(node.Url + "/clear")
+			_, err := http.Get( + "/clear")
 			if err != nil {
 				println(err.Error())
 				(*w).Write([]byte("\"error\""))
 			}
-		}()
+		}(node.Url)
 	}
 	wg.Wait()
 	(*w).Write([]byte("done"))
@@ -78,14 +78,14 @@ func (h *RequestHandler) Prepare(w *http.ResponseWriter, req *http.Request) {
 	for _, node := range nodes {
 		wg.Add(1)
 
-		go func() {
+		go func(nodeUrl string) {
 			defer wg.Done()
-			_, err := http.Get(node.Url + "/prepare")
+			_, err := http.Get(nodeUrl + "/prepare")
 			if err != nil {
 				println(err.Error())
 				(*w).Write([]byte("\"error\""))
 			}
-		}()
+		}(node.Url)
 	}
 	wg.Wait()
 	(*w).Write([]byte("done"))
