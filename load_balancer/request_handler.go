@@ -62,7 +62,7 @@ func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
 		go func(nodeUrl string) {
 			defer wg.Done()
 
-			_, err := http.Get( + "/clear")
+			_, err := http.Get(nodeUrl + "/clear")
 			if err != nil {
 				println(err.Error())
 				(*w).Write([]byte("\"error\""))
