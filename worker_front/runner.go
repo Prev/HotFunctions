@@ -51,6 +51,9 @@ func (r *FunctionRunner) PrepareImages() error {
 	logger.Println("Build image", strings.Join(lists, ","))
 
 	for _, functionName := range lists {
+		if functionName == "" {
+			continue
+		}
 		image, err := r.imageBuilder.BuildSafe(functionName)
 		if err != nil {
 			logger.Println(err.Error())
