@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Prev/HotFunctions/worker_front/types"
@@ -55,24 +56,38 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
+	wg := sync.WaitGroup{}
 	for _, node := range nodes {
-		_, err := http.Get(node.Url + "/clear")
-		if err != nil {
-			println(err.Error())
-			(*w).Write([]byte("\"error\""))
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			_, err := http.Get(node.Url + "/clear")
+			if err != nil {
+				println(err.Error())
+				(*w).Write([]byte("\"error\""))
+			}
+		}()
 	}
+	wg.Wait()
 	(*w).Write([]byte("done"))
 }
 
 func (h *RequestHandler) Prepare(w *http.ResponseWriter, req *http.Request) {
+	wg := sync.WaitGroup{}
 	for _, node := range nodes {
-		_, err := http.Get(node.Url + "/prepare")
-		if err != nil {
-			println(err.Error())
-			(*w).Write([]byte("\"error\""))
-		}
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			_, err := http.Get(node.Url + "/prepare")
+			if err != nil {
+				println(err.Error())
+				(*w).Write([]byte("\"error\""))
+			}
+		}()
 	}
+	wg.Wait()
 	(*w).Write([]byte("done"))
 }
 

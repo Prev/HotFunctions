@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 )
 
@@ -19,6 +20,8 @@ var fakeMode = false
 var nodes []*scheduler.Node
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	if len(os.Args) < 2 {
 		println("Usage: go run *.go rr|ll|hash|ours|pasch [fakeMode=0]")
 		os.Exit(-1)
