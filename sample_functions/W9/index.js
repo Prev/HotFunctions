@@ -1,6 +1,6 @@
 exports.handle = (event, context) => {
 	let sum = 0;
-	for (let i = 0; i < 9000000; i++) {
+	for (let i = 0; i < 13000000; i++) {
 		sum += Math.random();
 	}
 

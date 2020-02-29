@@ -3,13 +3,17 @@ package scheduler
 import (
 	"crypto/md5"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sort"
+	"sync"
 )
 
 type ConsistentHashingScheduler struct {
 	Scheduler
-	virtualNodes []vNode
+	virtualNodes     []vNode
+	maxLoadThreshold uint
+	mutex            *sync.Mutex
 }
 
 type vNode struct {
@@ -17,9 +21,11 @@ type vNode struct {
 	node    *Node
 }
 
-func NewConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int) *ConsistentHashingScheduler {
+func NewConsistentHashingScheduler(nodes *[]*Node, numVirtualNodes int, maxLoadThreshold uint) *ConsistentHashingScheduler {
 	s := ConsistentHashingScheduler{}
+	s.maxLoadThreshold = maxLoadThreshold
 	s.virtualNodes = make([]vNode, len(*nodes)*numVirtualNodes)
+	s.mutex = new(sync.Mutex)
 
 	for i, node := range *nodes {
 		for m := 0; m < numVirtualNodes; m++ {
@@ -39,8 +45,8 @@ func (s ConsistentHashingScheduler) hash(key string) int {
 	return int(binary.BigEndian.Uint32(b2)) % 1234567 // magic number
 }
 
-func (s ConsistentHashingScheduler) Select(key string) (*Node, error) {
-	hashkey := s.hash(key)
+func (s ConsistentHashingScheduler) Select(functionName string) (*Node, error) {
+	hashkey := s.hash(functionName)
 	n := len(s.virtualNodes)
 
 	// Binary search
@@ -60,26 +66,32 @@ func (s ConsistentHashingScheduler) Select(key string) (*Node, error) {
 		right = 0
 	}
 
-	return s.virtualNodes[right].node, nil
+	//return s.virtualNodes[right].node, nil
 
-	// Check for the capacity
-	// i := right
-	// last := (i - 1 + n) % n
-	// for {
-	// 	if s.virtualNodes[i].node.capacity() > 0 {
-	// 		return s.virtualNodes[i].node, nil
-	// 	}
-	// 	if i == last {
-	// 		// all ring elements are visited
-	// 		break
-	// 	}
-	// 	i = (i + 1) % n
-	// }
+	// Bounded load
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	i := right
+	last := (i - 1 + n) % n
+	for {
+		if s.virtualNodes[i].node.Load < s.maxLoadThreshold {
 
-	// return nil, errors.New("no available node found")
+			s.virtualNodes[i].node.Load++
+			return s.virtualNodes[i].node, nil
+		}
+		if i == last {
+			// all ring elements are visited
+			break
+		}
+		i = (i + 1) % n
+	}
+
+	return nil, errors.New("no available node found")
 }
 
-func (s ConsistentHashingScheduler) Finished(node *Node, _ string, _ int64) error {
-	// Do nothing
+func (s ConsistentHashingScheduler) Finished(node *Node, _ string) error {
+	s.mutex.Lock()
+	node.Load--
+	s.mutex.Unlock()
 	return nil
 }

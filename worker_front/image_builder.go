@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,26 +15,36 @@ import (
 	"github.com/mholt/archiver"
 )
 
-const DOWNLOAD_PATH_PREFIX = "_downloads/"
-const ENV_PATH_PREFIX = "envs/"
-
 type ImageBuilder struct {
-	isBuilding map[string]bool
-	mutex      *sync.Mutex
+	isBuilding         map[string]bool
+	mutex              *sync.Mutex
+	DownloadPathPrefix string
+	EnvPathPrefix      string
+	cachingOptions     *CachingOptions
 }
 
-func newImageBuilder() *ImageBuilder {
+func newImageBuilder(cachingOptions *CachingOptions) *ImageBuilder {
 	b := new(ImageBuilder)
 	b.isBuilding = make(map[string]bool)
 	b.mutex = new(sync.Mutex)
+	b.DownloadPathPrefix = "_downloads/"
+	b.EnvPathPrefix = "envs/"
+	b.cachingOptions = cachingOptions
 	return b
 }
 
-func (b *ImageBuilder) BuildSafe(functionName string) error {
+type Image struct {
+	Name         string
+	FunctionName string
+	IsRestMode   bool
+	Size         int64
+}
+
+func (b *ImageBuilder) BuildSafe(functionName string) (Image, error) {
 	b.mutex.Lock()
 	if b.isBuilding[functionName] == true {
 		// Wait until image is built
-		logger.Printf("Image for function '%s' not found. Wait for build compeletion...\n", functionName)
+		logger.Printf("Image for function '%s' already have been building in other process. Wait for build compeletion...\n", functionName)
 		for {
 			b.mutex.Unlock()
 			time.Sleep(time.Second / 20)
@@ -50,8 +61,8 @@ func (b *ImageBuilder) BuildSafe(functionName string) error {
 		b.mutex.Unlock()
 
 		logger.Printf("Image for function '%s' not found. Image build start.\n", functionName)
-		if err := b.Build(functionName); err != nil {
-			return err
+		if _, err := b.Build(functionName); err != nil {
+			return Image{}, err
 		}
 
 		b.mutex.Lock()
@@ -61,47 +72,63 @@ func (b *ImageBuilder) BuildSafe(functionName string) error {
 		logger.Printf("Image for function '%s' build fin.\n", functionName)
 	}
 
-	return nil
+	fi, _ := os.Stat(b.DownloadPathPrefix + functionName + ".tar")
+	size := fi.Size()
+
+	return Image{
+		b.imageTagName(functionName),
+		functionName,
+		b.cachingOptions.UsingRestMode,
+		size,
+	}, nil
 }
 
-func (b *ImageBuilder) Build(functionName string) error {
+func (b *ImageBuilder) Build(functionName string) (Image, error) {
 	// Download files of the function
 	functionPath, err := b.downloadFiles(functionName)
 	if err != nil {
-		return err
+		return Image{}, err
 	}
 
 	// Read config.json file
 	config, err := b.getConfigOfTheFunction(functionPath)
 	if err != nil {
-		return err
+		return Image{}, err
 	}
 
 	// Make tar file for docker
 	tarPath, err := b.makeTarFile(functionPath, config["environment"])
 	if err != nil {
-		return err
+		return Image{}, err
 	}
 
 	// Build docker image
 	if err := b.buildImageWithTar(functionName, tarPath); err != nil {
-		return err
+		return Image{}, err
 	}
 
-	return nil
+	fi, _ := os.Stat(tarPath)
+	size := fi.Size()
+
+	return Image{
+		b.imageTagName(functionName),
+		functionName,
+		b.cachingOptions.UsingRestMode,
+		size,
+	}, nil
 }
 
 func (b *ImageBuilder) downloadFiles(functionName string) (string, error) {
-	os.MkdirAll(DOWNLOAD_PATH_PREFIX, 0700)
-	zipFilePath := DOWNLOAD_PATH_PREFIX + functionName + ".zip"
-	destPath := DOWNLOAD_PATH_PREFIX + functionName
+	os.MkdirAll(b.DownloadPathPrefix, 0700)
+	zipFilePath := b.DownloadPathPrefix + functionName + ".zip"
+	destPath := b.DownloadPathPrefix + functionName
 
 	// Remove old files
 	os.RemoveAll(zipFilePath)
 	os.RemoveAll(destPath)
 
 	// Download zip file
-	resp, err := http.Get(USER_FUNCTION_URL_PREFIX + functionName + ".zip")
+	resp, err := http.Get(UserFunctionUrlPrefix + functionName + ".zip")
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +149,7 @@ func (b *ImageBuilder) downloadFiles(functionName string) (string, error) {
 
 	// Unzip file
 	z := archiver.Zip{}
-	if err := z.Unarchive(zipFilePath, DOWNLOAD_PATH_PREFIX); err != nil {
+	if err := z.Unarchive(zipFilePath, b.DownloadPathPrefix); err != nil {
 		return "", err
 	}
 	os.RemoveAll(zipFilePath)
@@ -149,7 +176,7 @@ func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string,
 	fileList := []string{}
 
 	// Add env files
-	envDir := ENV_PATH_PREFIX + envType
+	envDir := b.EnvPathPrefix + envType
 	entries, err := ioutil.ReadDir(envDir)
 	if err != nil {
 		return "", err
@@ -176,6 +203,9 @@ func (b *ImageBuilder) makeTarFile(functionPath string, envType string) (string,
 		return "", err
 	}
 
+	// Remove directory
+	os.RemoveAll(functionPath)
+
 	return tarFilePath, nil
 }
 
@@ -190,9 +220,14 @@ func (b *ImageBuilder) buildImageWithTar(functionName string, tarPath string) er
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(300)*time.Second)
 	defer cancel()
 
+	dockerFileName := "/Dockerfile"
+	if b.cachingOptions.UsingRestMode {
+		dockerFileName = "/Dockerfile-rest"
+	}
+
 	opt := types.ImageBuildOptions{
-		Dockerfile: "/Dockerfile",
-		Tags:       []string{imageTagName(functionName)},
+		Dockerfile: dockerFileName,
+		Tags:       []string{b.imageTagName(functionName)},
 	}
 
 	out, err := cli.ImageBuild(ctx, dockerBuildContext, opt)
@@ -205,4 +240,20 @@ func (b *ImageBuilder) buildImageWithTar(functionName string, tarPath string) er
 	out.Body.Close()
 
 	return nil
+}
+
+func (b *ImageBuilder) RemoveImage(functionName string) error {
+	ctx := context.Background()
+	_, err := cli.ImageRemove(ctx, b.imageTagName(functionName), types.ImageRemoveOptions{Force: true})
+
+	// Remove tar file
+	os.RemoveAll(b.DownloadPathPrefix + functionName + ".tar")
+	return err
+}
+
+func (b *ImageBuilder) imageTagName(functionName string) string {
+	if b.cachingOptions.UsingRestMode {
+		return "hf_" + strings.ToLower(functionName) + "_rest"
+	}
+	return "hf_" + strings.ToLower(functionName)
 }
