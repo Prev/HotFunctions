@@ -1,7 +1,7 @@
-# HotFunctions [![Build Status](https://travis-ci.org/Prev/HotFunctions.svg)](https://travis-ci.org/Prev/HotFunctions)[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Prev/HotFunctions/blob/master/LICENSE)
+# HotFunctions [![Build Status](https://travis-ci.org/Prev/HotFunctions.svg)](https://travis-ci.org/Prev/HotFunctions) [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Prev/HotFunctions/blob/master/LICENSE)
 
 
-A simple FaaS framework and tools to test the performance of load balancing algorithms.
+A simple FaaS framework and tools to test performance of load balancing algorithms.
 Consists of 5 parts like described in below:
 
 - [Worker front](./worker_front): Codes for the worker node to run the user functions in the Docker container.
