@@ -19,8 +19,9 @@ Consists of 5 parts like described in below:
 
 ### Step1: Configure a worker node (or worker nodes)
 
-Follow the "How to run" section on [worker front page](./worker_front).
-Visit http://localhost:8222/execute?name=W1 to test worker node (This command will execute function `W1` and send you a response).
+Follow the "How to run" section on [worker front page](./worker_front).  
+After configuration, visit http://localhost:8222/execute?name=W1 to test worker node.
+(This command will execute function `W1` and send you a response)
 Reponse would be like below:
 
 ```json
@@ -46,8 +47,10 @@ You can see the detail of the supporting sample functions in [sample functions p
 
 ### Step2: Configure a load balancer
 
-Follow the "How to run" section on [load balancer page](./load_balancer).
-Visit http://localhost:8111/execute?name=W1 to test load balancer.
+Follow the "How to run" section on [load balancer page](./load_balancer).  
+After configuration, visit http://localhost:8111/execute?name=W1 to test load balancer.
+Note that you should not close the worker node while running the load balancer.
+
 Load balancer will send a similar response with worker node, but additional information from load balancing will be appended to the response like below.
 
 ```json
