@@ -1,1 +1,4 @@
 _artifacts/
+*/venv/
+*/node_modules/
+*/lib/*.jar

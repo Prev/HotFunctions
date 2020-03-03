@@ -1,30 +1,23 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/Prev/HotFunctions/worker_front/types"
 )
 
+// RequestHandler of the worker front
 type RequestHandler struct {
 	http.Handler
-	cachedImages      map[string]int64
-	cachedImagesMutex *sync.Mutex
-	imageBuilder      *ImageBuilder
+	functionRunner *FunctionRunner
 }
 
-func newRequestHandler() *RequestHandler {
+func newRequestHandler(options CachingOptions) *RequestHandler {
 	h := new(RequestHandler)
-	h.cachedImages = make(map[string]int64)
-	h.cachedImagesMutex = new(sync.Mutex)
-	h.imageBuilder = newImageBuilder()
+	h.functionRunner = newFunctionRunner(options)
 	return h
 }
 
@@ -34,15 +27,8 @@ type FailResponse struct {
 }
 
 type ConfigureSuccessResponse struct {
-	Result  string
 	Message string
-}
-
-type ExecSuccessResponse struct {
-	Result                FunctionResponseResult
-	IsWarm                bool
-	ExecutionTime         int64
-	InternalExecutionTime int64
+	State   CachingOptions
 }
 
 func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -50,10 +36,14 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	switch req.URL.Path {
-	case "/execute":
-		h.ExecFunction(&w, req)
 	case "/configure":
 		h.ConfigureWorker(&w, req)
+	case "/clear":
+		h.Clear(&w, req)
+	case "/prepare":
+		h.Prepare(&w, req)
+	case "/execute":
+		h.ExecFunction(&w, req)
 	default:
 		w.WriteHeader(404)
 		writeFailResponse(&w, "404 Not found on given path")
@@ -62,19 +52,68 @@ func (h *RequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (h *RequestHandler) ConfigureWorker(w *http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
-	cacheNumParam := q["cache_num"]
+	oldOptions := h.functionRunner.cachingOptions
 
-	if len(cacheNumParam) == 0 {
-		writeFailResponse(w, "param 'cache_num' is not given")
-		return
+	if v := q["user_code_size_limit"]; len(v) > 0 {
+		val, _ := strconv.ParseInt(v[0], 10, 64)
+		h.functionRunner.cachingOptions.UserCodeSizeLimit = val
+	}
+	if v := q["container_pool_limit"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
+		h.functionRunner.cachingOptions.ContainerPoolLimit = val
+	}
+	if v := q["container_pool_num"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
+		h.functionRunner.cachingOptions.ContainerPoolNum = val
+	}
+	if v := q["using_rest_mode"]; len(v) > 0 {
+		if v[0] == "true" {
+			h.functionRunner.cachingOptions.UsingRestMode = true
+		} else if v[0] == "false" {
+			h.functionRunner.cachingOptions.UsingRestMode = false
+		}
+		h.functionRunner.images = make(map[string]Image)
+	}
+	if v := q["rest_container_life_time"]; len(v) > 0 {
+		val, _ := strconv.Atoi(v[0])
+		h.functionRunner.cachingOptions.RestContainerLifeTime = val
 	}
 
-	cacheNum, _ := strconv.Atoi(cacheNumParam[0])
-	IMAGE_CACHE_NUM = cacheNum
+	message := "nothing changed"
+	newOptions := h.functionRunner.cachingOptions
+	if oldOptions.UserCodeSizeLimit != newOptions.UserCodeSizeLimit ||
+		oldOptions.ContainerPoolLimit != newOptions.ContainerPoolLimit ||
+		oldOptions.ContainerPoolNum != newOptions.ContainerPoolNum ||
+		oldOptions.UsingRestMode != newOptions.UsingRestMode ||
+		oldOptions.RestContainerLifeTime != newOptions.RestContainerLifeTime {
+		message = "configure changed"
+	}
 
-	resp := ConfigureSuccessResponse{"success", "configure changed successfully"}
+	resp := ConfigureSuccessResponse{message, h.functionRunner.cachingOptions}
 	bytes, _ := json.Marshal(resp)
 	(*w).Write(bytes)
+}
+
+func (h *RequestHandler) Clear(w *http.ResponseWriter, req *http.Request) {
+	q := req.URL.Query()
+	if v := q["reset_images"]; len(v) > 0 {
+		if v[0] == "true" {
+			h.functionRunner.Reset(true)
+			(*w).Write([]byte("done; reset_images=true"))
+			return
+		}
+	}
+	h.functionRunner.Reset(false)
+	(*w).Write([]byte("done; reset_images=false"))
+}
+
+func (h *RequestHandler) Prepare(w *http.ResponseWriter, req *http.Request) {
+	err := h.functionRunner.PrepareImages()
+	if err != nil {
+		(*w).Write([]byte(err.Error()))
+	} else {
+		(*w).Write([]byte("done"))
+	}
 }
 
 func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request) {
@@ -88,72 +127,29 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 	startTime := makeTimestamp()
 
 	functionName := nameParam[0]
-	imageName := imageTagName(functionName)
-
-	// logger.Println("function requested:", functionName)
-
-	cacheExists := false
-	h.cachedImagesMutex.Lock()
-	if _, exists := h.cachedImages[imageName]; exists == true {
-		cacheExists = true
-	}
-	h.cachedImagesMutex.Unlock()
-
-BUILD_IMAGE:
-	if cacheExists == false {
-		h.imageBuilder.BuildSafe(functionName)
-	}
-
-	out, err := RunContainer(imageName)
-	if err != nil {
-		logger.Println(err.Error(), "Retry...")
-		cacheExists = false
-		goto BUILD_IMAGE
+	out, meta := h.functionRunner.RunFunction(functionName)
+	if out == nil {
+		writeFailResponse(w, "error on running a function")
+		return
 	}
 
 	endTime := makeTimestamp()
 	logger.Println("fin", functionName)
 
-	resp := ExecSuccessResponse{
-		out.Result,
-		cacheExists,
+	resp := types.ExecSuccessResponse{
+		out.Data,
 		endTime - startTime,
 		out.EndTime - out.StartTime,
+		meta,
 	}
 	bytes, _ := json.Marshal(resp)
 	(*w).Write(bytes)
-
-	go h.updateCachedImages(imageName)
-}
-
-func (h *RequestHandler) updateCachedImages(imageName string) {
-	h.cachedImagesMutex.Lock()
-	h.cachedImages[imageName] = time.Now().Unix()
-
-	// Remove old images
-	tmp := make([]string, 0, len(h.cachedImages))
-	for key, val := range h.cachedImages {
-		tmp = append(tmp, strconv.FormatInt(val, 10)+":"+key)
-	}
-	sort.Strings(tmp)
-
-	for i := 0; i < len(tmp)-IMAGE_CACHE_NUM; i++ {
-		spliited := strings.Split(tmp[i], ":")
-		key := spliited[1]
-
-		_, err := cli.ImageRemove(context.Background(), key, types.ImageRemoveOptions{Force: true})
-		if err != nil {
-			logger.Println(err.Error())
-		}
-		delete(h.cachedImages, key)
-	}
-
-	h.cachedImagesMutex.Unlock()
 }
 
 func writeFailResponse(w *http.ResponseWriter, message string) {
 	resp := FailResponse{true, message}
 	bytes, _ := json.Marshal(resp)
+	(*w).WriteHeader(500)
 	(*w).Write(bytes)
 }
 

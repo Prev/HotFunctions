@@ -4,7 +4,8 @@ mkdir _artifacts
 for D in *; do
     if [ -d "${D}" ]; then
     	if [ ! "${D}" = "_artifacts" ]; then
-    		zip "_artifacts/${D}.zip" "${D}"/* "${D}"/**/*
+    		zip -r "_artifacts/${D}.zip" "${D}" -x \*.pyc\*
+			echo "${D}" >> _artifacts/lists.txt
 		fi
     fi
 done

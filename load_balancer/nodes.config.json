@@ -1,10 +1,4 @@
 [
-	{
-		"url": "http://localhost:8222",
-		"maxCapacity": 8
-	},
-	{
-		"url": "http://localhost:8222",
-		"maxCapacity": 8
-	}
+	"http://localhost:8222",
+	"http://localhost:8222"
 ]

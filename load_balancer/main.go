@@ -2,89 +2,118 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/Prev/HotFunctions/load_balancer/scheduler"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
-	"sync"
-	"time"
+	"runtime"
+	"strconv"
 )
 
-type NodeConfigData struct {
-	Url         string `json:"url"`
-	MaxCapacity int    `json:"maxCapacity"`
-}
-
 var logger *log.Logger
-var mutex *sync.Mutex
+var sched scheduler.Scheduler
+var schedType string
+var fakeMode = false
+var nodes []*scheduler.Node
 
 func main() {
-	logger = initLogger()
-	nodes := initNodesFromConfig("nodes.config.json")
-	sched := newLeastLoadedScheduler(&nodes)
-	// sched := newConsistentHashingScheduler(&nodes, 8)
-	// sched := newTableBasedScheduler(&nodes)
-	// sched := newAdaptiveScheduler(&nodes, 2)
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	simulator := newSimulator("data/events.csv")
-	simulator.Start(func(functionName string, time int) {
-		node, err := sched.pick(functionName)
+	if len(os.Args) < 2 {
+		println("Usage: go run *.go rr|ll|hash|ours|pasch [fakeMode=0]")
+		os.Exit(-1)
+	}
+	schedType = os.Args[1]
 
+	if len(os.Args) > 2 {
+		intVal, err := strconv.Atoi(os.Args[2])
 		if err != nil {
-			fmt.Printf("[fail running] %s: %s\n", functionName, err.Error())
-			return
+			println("Argument fakeMode should be integer (its value means number of the fake nodes)")
+			os.Exit(-1)
 		}
 
-		go node.runFunction(functionName, func(n string, time int64) {
-			// sched.appendExecutionResult(n, time)
-		})
-	})
+		if intVal > 0 {
+			println("Run as fakeMode (do not send a request to the worker node), # of nodes: ", intVal)
+			fakeMode = true
+			for i := 0; i < intVal; i++ {
+				nodes = append(nodes, scheduler.NewNode(i, ""))
+			}
+			goto GuessSchedType
+		}
+	}
+	println("Load node info from `nodes.config.json`")
+	nodes = initNodesFromConfig("nodes.config.json")
+	fmt.Printf("%d nodes found\n", len(nodes))
 
-	time.Sleep(time.Second * 20)
+GuessSchedType:
+	setScheduler(schedType)
+
+	port := 8111
+
+	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
+	logger.Printf("Server listening at :%d\n", port)
+
+	http.Handle("/", newRequestHandler())
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if err != nil {
+		panic(err)
+	}
 }
-
-func initNodesFromConfig(configFilePath string) []*Node {
+// Init node list from the config file
+func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 	nodeConfigFile, err := os.Open(configFilePath)
 	if err != nil {
 		panic(err)
 	}
 	defer nodeConfigFile.Close()
 
-	var nodeConfigs []NodeConfigData
+	var nodeConfigs []string
 	byteValue, _ := ioutil.ReadAll(nodeConfigFile)
-	json.Unmarshal([]byte(byteValue), &nodeConfigs)
+	json.Unmarshal(byteValue, &nodeConfigs)
 
-	nodes := make([]*Node, len(nodeConfigs))
-	for i, nc := range nodeConfigs {
-		nodes[i] = newNode(i, nc.Url, nc.MaxCapacity)
+	nodes := make([]*scheduler.Node, len(nodeConfigs))
+	for i, url := range nodeConfigs {
+		nodes[i] = scheduler.NewNode(i, url)
 	}
 	return nodes
 }
 
-func initLogger() *log.Logger {
-	os.MkdirAll("logs", 0755)
-	logFileName := "logs/log-" + time.Now().Format("2006-01-02T15:04:05") + ".out"
-	outputFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		panic(err)
+func setScheduler(newSchedType string) error {
+	switch newSchedType {
+	case "rr":
+		// Round Robin Scheduler
+		println("Using Round Robin Scheduler")
+		sched = scheduler.NewRoundRobinScheduler(&nodes)
+	case "ll":
+		// Least Loaded Scheduler
+		// Scheduler picks the node who has minimum executing tasks
+		println("Using Least Loaded Scheduler")
+		sched = scheduler.NewLeastLoadedScheduler(&nodes)
+
+	case "hash":
+		// Consistent Hashing Scheduler
+		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
+		println("Using Consistent Hashing Scheduler")
+		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8, 8)
+
+	case "pasch":
+		// Consistent Hashing Scheduler
+		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
+		println("Using PASch Extended Scheduler")
+		sched = scheduler.NewPASchExtendedScheduler(&nodes, 8)
+
+	case "ours":
+		// Proposing Greedy Scheduler
+		println("Using Our Scheduler")
+		sched = scheduler.NewOurScheduler(&nodes, 8, 5, 3)
+
+	default:
+		return errors.New("unsupported scheduler type")
 	}
-	return log.New(outputFile, "", log.Ldate|log.Ltime)
-}
 
-func printCapacityTable(nodes *[]*Node) {
-	out := "--------capacity table--------\n" +
-		"|Node\t|Total\t|Spare\t|Run\t|\n"
-
-	for _, node := range *nodes {
-		runningFunctions := ""
-		for fname, num := range node.running {
-			for i := 0; i < num; i++ {
-				runningFunctions += fmt.Sprintf("%s, ", fname)
-			}
-		}
-
-		out += fmt.Sprintf("|%d\t|%d\t|%d\t|%s\t|\n", node.id, node.maxCapacity, node.capacity(), runningFunctions)
-	}
-	out += "--------------------------"
-	println(out)
+	schedType = newSchedType
+	return nil
 }
