@@ -1,4 +1,5 @@
-# HotFunctions
+# HotFunctions [![Build Status](https://travis-ci.org/Prev/HotFunctions.svg)](https://travis-ci.org/Prev/HotFunctions)[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Prev/HotFunctions/blob/master/LICENSE)
+
 
 A simple FaaS framework and tools to test the performance of load balancing algorithms.
 Consists of 5 parts like described in below:
