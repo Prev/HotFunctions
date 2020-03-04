@@ -27,3 +27,5 @@ require (
 )
 
 replace github.com/Prev/HotFunctions/worker_front/types => ./types
+
+replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
