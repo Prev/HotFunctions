@@ -31,6 +31,17 @@ Receives application request with RESTful API and executes the function with Doc
 	- To use this option, set `USING_REST_MODE` environment variable as `true`
 	- The default lifetime of each idle container is 10 seconds. You can change is value with `REST_CONTAINER_LIFE_TIME`.
 
+### Recommended step before running
+
+As our framework includes automated image build & pull step on running a function.
+But pulling the base image(e.g. `python`, `java`, `nodejs`) takes quite a lot time,
+we recommend you to pull base images before running the worker front.
+
+```bash
+$ docker pull openjdk:8
+$ docker pull python:3.7
+$ docker pull node:12
+``` 
 
 ### How to run
 
@@ -54,6 +65,25 @@ $ go run *.go stop
 
 After running the worker front, you can access the worker front with visiting `http://localhost:8222`.
 To run the function `W1`, request `http://localhost:8222/execute?name=W1`.
+Response would be like below:
+
+```json
+{
+	"Result": {
+		"statusCode": 200,
+		"body": "Hello World2998950"
+	},
+	"ExecutionTime": 3373,
+	"InternalExecutionTime": 98,
+	"Meta": {
+		"ImageBuilt": true,
+		"UsingPooledContainer": false,
+		"UsingExistingRestContainer": false,
+		"ContainerName": "hf_w1__9437_98081",
+		"ImageName": "hf_w1"
+	}
+}
+```
 
 
 ### Configure with RESTful API

@@ -22,3 +22,29 @@ go run *.go rr|ll|ch|pasch|ours
 
 Options `rr`, `ll`, `ch`, `pasch`, `ours` mean Round Robin, Least Loaded, Consistent Hashing with bounded load, PASch extended, and Ours, respectively.
 
+
+Load balancer will send a similar response with worker node, but additional information from load balancing will be appended to the response like below.
+
+```json
+{
+	"Result": {
+		"statusCode": 200,
+		"body": "Hello World2999663"
+	},
+	"ExecutionTime": 929,
+	"InternalExecutionTime": 98,
+	"Meta": {
+		"ImageBuilt": false,
+		"UsingPooledContainer": false,
+		"UsingExistingRestContainer": false,
+		"ContainerName": "hf_w1__9572_27887",
+		"ImageName": "hf_w1"
+	},
+	"LoadBalancingInfo": {
+		"WorkerNodeId": 0,
+		"WorkerNodeUrl": "http://localhost:8222",
+		"Algorithm": "ours",
+		"AlgorithmLatency": 0.015869140625
+	}
+}
+```
