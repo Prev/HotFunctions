@@ -3,10 +3,10 @@ module github.com/Prev/HotFunctions/worker_front
 go 1.13
 
 require (
-	github.com/Prev/HotFunctions/worker_front/types v0.0.0
+	github.com/Prev/HotFunctions/worker_front/types v1.0.0
 	github.com/containerd/containerd v1.3.2 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker v1.4.2-0.20200114201811-16a3519d870b
+	github.com/docker/docker v1.4.2-0.20190717161051-705d9623b7c1
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
@@ -27,3 +27,5 @@ require (
 )
 
 replace github.com/Prev/HotFunctions/worker_front/types => ./types
+
+replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
