@@ -4,8 +4,8 @@ Distribute functions to worker nodes. There are 5 different scheduling algorithm
 
 - Round Robin
 - Least Loaded: Equivalent with least connected of NGINX
-- Consistent Hashing with bounded load: Variation of Consistent Hashing algorithm that limits the load per each node [arxiv](https://arxiv.org/abs/1608.01350)
-- PASch extended: An extended version changing the package id to an application name of the [PASch algorithm](https://ieeexplore.ieee.org/document/8752939)
+- Consistent Hashing with bounded load: Variation of Consistent Hashing algorithm that limits the load per each node ([arxiv](https://arxiv.org/abs/1608.01350))
+- PASch Extended: An extended version changing the package id to an application name of the [PASch algorithm](https://ieeexplore.ieee.org/document/8752939)
 - Ours: Proposing algorithm that maximizes locality while minimizing load imbalance
 
 ### Configuring worker nodes

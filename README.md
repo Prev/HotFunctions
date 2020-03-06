@@ -11,7 +11,7 @@ Consists of 5 parts like described in below:
 - [Utils](./utils): Utilities like generating simulation scenario or analyzing the result.
 
 
-## Run the project
+## Getting Started
 ### Prerequisites
 
 - [Golang](https://golang.org/) >= 1.13 (Since we use `gomod` for dependency control, at least 1.11 is required)
@@ -20,7 +20,12 @@ Consists of 5 parts like described in below:
 
 ### Step1: Configure a worker node (or worker nodes)
 
-Follow the "How to run" section on [worker front page](./worker_front).  
+```bash
+$ cd worker_front
+$ go run *.go start
+```
+
+You can see the details in [worker front](./worker_front) page.  
 After configuration, visit http://localhost:8222/execute?name=W1 to test worker node.
 
 Our framework supports 30 different functions.
@@ -28,7 +33,12 @@ You can see the detail of the supporting sample functions in [sample functions p
 
 ### Step2: Configure a load balancer
 
-Follow the "How to run" section on [load balancer page](./load_balancer).  
+```bash
+$ cd load_balancer
+$ go run *.go rr|ll|ch|pasch|ours
+```
+
+You can also see the details on [load balancer](./load_balancer) page.  
 After configuration, visit http://localhost:8111/execute?name=W1 to test load balancer.
 Note that you should not close the worker node while running the load balancer.
 
