@@ -1,12 +1,12 @@
 language: go
 
 # env: GO111MODULE=on GOFLAGS='-mod vendor'
-env: GO111MODULE=on
+#env: GO111MODULE=on
 
 # You don't need to test on very old versions of the Go compiler. It's the user's
 # responsibility to keep their compiler up to date.
 go:
-  - 1.13.x
+  - 1.14.x
 
 go_import_path: github.com/Prev/HotFunctions
 
@@ -22,7 +22,7 @@ notifications:
   email: false
 
 script:
-  - go test load_balancer/scheduler/*.go
-  - go build load_balancer/*.go
-  - go build worker_front/*.go
-  - go build simulator/*.go
+  - cd worker_front && env GO111MODULE=on go build
+  - cd ../load_balancer && env GO111MODULE=on go build
+  - cd ./scheduler && go test
+  - cd ../../simulator && go build

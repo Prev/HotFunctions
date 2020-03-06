@@ -6,7 +6,7 @@ require (
 	github.com/Prev/HotFunctions/worker_front/types v1.0.0
 	github.com/containerd/containerd v1.3.2 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker v1.4.2-0.20200204220554-5f6d6f3f2203
+	github.com/docker/docker v1.4.2-0.20190717161051-705d9623b7c1
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
