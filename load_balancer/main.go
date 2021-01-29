@@ -23,7 +23,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	if len(os.Args) < 2 {
-		println("Usage: go run *.go rr|ll|hash|ours|pasch [fakeMode=0]")
+		println("Usage: go run *.go rr|ll|hash|ours|pasch|tradeoff [fakeMode=0]")
 		os.Exit(-1)
 	}
 	schedType = os.Args[1]
@@ -62,6 +62,7 @@ GuessSchedType:
 		panic(err)
 	}
 }
+
 // Init node list from the config file
 func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 	nodeConfigFile, err := os.Open(configFilePath)
@@ -109,6 +110,20 @@ func setScheduler(newSchedType string) error {
 		// Proposing Greedy Scheduler
 		println("Using Our Scheduler")
 		sched = scheduler.NewOurScheduler(&nodes, 8, 5, 3)
+
+	case "tradeoff":
+		// Trade-off algorithm for exploiting locality
+		println("Using Trade-Off Scheduler")
+
+		alpha := 0.0
+		beta := 0.5
+		if val, err := strconv.ParseFloat(os.Getenv("ALPHA"), 32); err != nil {
+			alpha = val
+		}
+		if val, err := strconv.ParseFloat(os.Getenv("BETA"), 32); err != nil {
+			beta = val
+		}
+		sched = scheduler.NewTradeOffScheduler(&nodes, alpha, beta)
 
 	default:
 		return errors.New("unsupported scheduler type")
