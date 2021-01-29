@@ -113,16 +113,15 @@ func setScheduler(newSchedType string) error {
 
 	case "tradeoff":
 		// Trade-off algorithm for exploiting locality
-		println("Using Trade-Off Scheduler")
-
-		alpha := 0.0
-		beta := 0.5
-		if val, err := strconv.ParseFloat(os.Getenv("ALPHA"), 32); err != nil {
-			alpha = val
+		var alpha, beta float64
+		var err error
+		if alpha, err = strconv.ParseFloat(os.Getenv("ALPHA"), 32); err != nil {
+			alpha = 0.0
 		}
-		if val, err := strconv.ParseFloat(os.Getenv("BETA"), 32); err != nil {
-			beta = val
+		if beta, err = strconv.ParseFloat(os.Getenv("BETA"), 32); err != nil {
+			beta = 0.5
 		}
+		fmt.Printf("Using Trade-Off Scheduler (alpha=%.3f, beta=%.3f)\n", alpha, beta)
 		sched = scheduler.NewTradeOffScheduler(&nodes, alpha, beta)
 
 	default:
