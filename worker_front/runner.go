@@ -12,13 +12,13 @@ import (
 )
 
 type FunctionRunner struct {
-	imageBuilder               *ImageBuilder
-	singletonContainerManager  *SingletonContainerManager
-	cachingOptions             CachingOptions
-	lru                        map[string]int64
-	images                     map[string]Image
-	containers                 []Container
-	mutex                      *sync.Mutex
+	imageBuilder              *ImageBuilder
+	singletonContainerManager *SingletonContainerManager
+	cachingOptions            CachingOptions
+	lru                       map[string]int64
+	images                    map[string]Image
+	containers                []Container
+	mutex                     *sync.Mutex
 }
 
 func newFunctionRunner(cachingOptions CachingOptions) *FunctionRunner {
@@ -78,11 +78,11 @@ func (r *FunctionRunner) RunFunction(functionName string) (*dtypes.ContainerResp
 	var err error
 	tryCnt := 0
 	meta := dtypes.FunctionExecutionMetaData{
-		ImageBuilt: false,
-		UsingPooledContainer: false,
+		ImageBuilt:                 false,
+		UsingPooledContainer:       false,
 		UsingExistingRestContainer: false,
-		ContainerName: "",
-		ImageName: "",
+		ContainerName:              "",
+		ImageName:                  "",
 	}
 
 	// Step1: Check for the image existence.
@@ -100,7 +100,10 @@ BuildImage:
 			logger.Println(err.Error())
 		}
 		meta.ImageBuilt = true
+
+		r.mutex.Lock()
 		r.images[functionName] = image
+		r.mutex.Unlock()
 	}
 
 	// Step2: Check for the container existence.
@@ -204,7 +207,7 @@ func (r *FunctionRunner) manageCaches() {
 						logger.Println(err.Error())
 					}
 
-					logger.Printf("Image %s is removed (%.1fMB, limit: %.1fMB)\n",
+					logger.Printf("Image %s is removed (%.1fMB, iit: %.1fMB)\n",
 						img.Name,
 						float64(img.Size) / 1000000,
 						float64(r.cachingOptions.UserCodeSizeLimit) / 1000000,
@@ -233,7 +236,7 @@ func (r *FunctionRunner) manageCaches() {
 	// Remove rest container based on lifetime
 	if r.cachingOptions.UsingRestMode {
 		now := time.Now().Unix()
-		lifetime := int64(r.cachingOptions.RestContainerLifeTime)
+		lifetim = int64(r.cachingOptions.RestContainerLifeTime)
 
 		for _, container := range r.singletonContainerManager.containers {
 			if now - r.lru[container.FunctionName] > lifetime {
@@ -241,7 +244,6 @@ func (r *FunctionRunner) manageCaches() {
 				container.Remove()
 				r.singletonContainerManager.Delete(container.FunctionName)
 			}
-		}
 	}
 }
 
