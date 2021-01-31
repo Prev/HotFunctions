@@ -32,7 +32,7 @@ DETAIL_LEVEL = 0
 if len(sys.argv) == 3 :
 	DETAIL_LEVEL = int(sys.argv[2])
 
-NUM_NODES = 10
+NUM_NODES = 8
 LOG_FORMAT = re.compile('(\S+)\s(\S+)\s(\d+)\s(\d+)\s(\S+)\s(.+)')
 std_time = math.inf
 last_time = -1
@@ -219,28 +219,42 @@ if DETAIL_LEVEL >= 2:
 	print('')
 
 print('\n-------------------- Cache hits --------------------')
-print('                           | Hit | Miss | %  | H.E.Time | M.E.Time')
-print('ImageReuse                 | %d | %d | %s | %dms | %dms |' % (
+print('                           |   Hit |  Miss |   % | H.E.Time | M.E.Time |')
+
+def print_row(*cols):
+	print('%s | %s | %s | %s | %sms | %sms |' % (
+		cols[0].ljust(26),
+		str(cols[1]).rjust(5),
+		str(cols[2]).rjust(5),
+		str(cols[3]).rjust(3),
+		str(round(cols[4])).rjust(6),
+		str(round(cols[5])).rjust(6),
+	))
+
+print_row(
+	'ImageReuse',
 	num_image_hit,
 	num_total - num_image_hit,
 	percentile(num_image_hit, num_total),
 	avg(opt1_execution_times[0]),
 	avg(opt1_execution_times[1]),
-))
-print('UsingPooledContainer       | %d | %d | %s | %dms | %dms |' % (
+)
+print_row(
+	'UsingPooledContainer',
 	num_using_pooled_container,
 	num_total - num_using_pooled_container,
 	percentile(num_using_pooled_container, num_total),
 	avg(opt2_execution_times[0]),
 	avg(opt2_execution_times[1]),
-))
-print('UsingExistingRestContainer | %d | %d | %s | %dms | %dms |' % (
+)
+print_row(
+	'UsingExistingRestContainer',
 	num_using_existing_rest_container,
 	num_total - num_using_existing_rest_container,
 	percentile(num_using_existing_rest_container, num_total),
 	avg(opt3_execution_times[0]),
 	avg(opt3_execution_times[1]),
-))
+)
 print('')
 
 
