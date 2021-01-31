@@ -111,7 +111,7 @@ func (h *RequestHandler) ConfigureBalancer(w *http.ResponseWriter, req *http.Req
 	(*w).Write([]byte("\n"))
 
 	for _, node := range nodes {
-		(*w).Write([]byte(",\"" + node.Url +  "\":"))
+		(*w).Write([]byte(",\"" + node.Url + "\":"))
 
 		resp, err := http.Get(node.Url + "/configure?" + req.URL.RawQuery)
 		if err != nil {
@@ -186,5 +186,6 @@ func (h *RequestHandler) ExecFunction(w *http.ResponseWriter, req *http.Request)
 func writeFailResponse(w *http.ResponseWriter, message string) {
 	resp := FailResponse{true, message}
 	bytes, _ := json.Marshal(resp)
+	(*w).WriteHeader(500)
 	(*w).Write(bytes)
 }
