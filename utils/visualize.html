@@ -81,7 +81,7 @@
 	<script>
 		const WIDTH_OVER_MSEC = 0.05;
 		const HEIGHT = 25;
-		const NUM_NODES = 10;
+		const NUM_NODES = 8;
 		const NODE_CAPACITY = 8;
 		
 		function draw(log) {
@@ -137,10 +137,19 @@
 					}
 				}
 				const top = localOffset * HEIGHT + 5;
+				let color = 'white';
+
+				if (e.indexOf('"UsingExistingRestContainer":true') !== -1) {
+					color = 'skyblue';
+				} else if (e.indexOf('"UsingPooledContainer":true') !== -1) {
+					color = '#89ff89';
+				} else if (e.indexOf('"ImageBuilt":true') !== -1) {
+					color = '#ffc7c7';
+				}
 
 				htmls[nodeIndex] += `
 				<div class="box"
-					 style="left: ${left}px; top: ${top}px; width: ${width}px">
+					 style="left: ${left}px; top: ${top}px; width: ${width}px; background-color: ${color}">
 					<span>${appName}</span></sub>
 				</div>`;
 

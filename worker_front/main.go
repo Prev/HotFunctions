@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/docker/docker/client"
-	"github.com/sevlyar/go-daemon"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,6 +9,9 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+
+	"github.com/docker/docker/client"
+	"github.com/sevlyar/go-daemon"
 )
 
 const daemonPidName = "daemon.pid"

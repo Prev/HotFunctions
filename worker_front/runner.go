@@ -100,7 +100,9 @@ BuildImage:
 			logger.Println(err.Error())
 		}
 		meta.ImageBuilt = true
+		r.mutex.Lock()
 		r.images[functionName] = image
+		r.mutex.Unlock()
 	}
 
 	// Step2: Check for the container existence.

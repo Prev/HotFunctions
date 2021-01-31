@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/go-connections/nat"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	dtypes "github.com/Prev/HotFunctions/worker_front/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 )
 
 const CPUQuota = 0

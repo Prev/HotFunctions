@@ -5,7 +5,7 @@ import re
 from pprint import pprint
 
 if len(sys.argv) < 2:
-	print('Usage: python analyzer.py <path/to/log> [<detail_mode=0>]')
+	print('Usage: python analyzer.py <path/to/log> [<detail_level=0>]')
 	sys.exit(-1)
 
 def avg(datalist):
@@ -27,9 +27,12 @@ def percentile(num, total):
 with open(sys.argv[1], 'r') as file:
 	log = file.readlines()
 
-DETAIL_MODE = len(sys.argv) == 3 and sys.argv[2] != '0'
+DETAIL_LEVEL = 0
 
-NUM_NODES = 10
+if len(sys.argv) == 3 :
+	DETAIL_LEVEL = int(sys.argv[2])
+
+NUM_NODES = 8
 LOG_FORMAT = re.compile('(\S+)\s(\S+)\s(\d+)\s(\d+)\s(\S+)\s(.+)')
 std_time = math.inf
 last_time = -1
@@ -37,7 +40,8 @@ last_time = -1
 records = []
 
 # Parse log
-for row in log[20:-20]:
+# for row in log[20:-20]:
+for row in log:
 	if len(row) <= 1:
 		continue
 
@@ -92,6 +96,7 @@ opt3_execution_times = ([], [])
 opt3_latencies = ([], [])
 
 executions_per_node = [{} for _ in range(0, NUM_NODES)]
+algorithm_latencies = []
 
 for start_time, end_time, function_name, data in records:
 	s = math.floor((start_time - std_time) / 1000)
@@ -113,6 +118,8 @@ for start_time, end_time, function_name, data in records:
 	latencies_per_functions[function_name].append(latency)
 	durations.append(duration)
 	latencies.append(latency)
+
+	algorithm_latencies.append(data['LoadBalancingInfo']['AlgorithmLatency'])
 
 	num_total += 1
 
@@ -136,6 +143,7 @@ for start_time, end_time, function_name, data in records:
 		num_using_existing_rest_container += 1
 		opt3_execution_times[0].append(duration)
 		opt3_latencies[0].append(latency)
+
 	else:
 		opt3_execution_times[1].append(duration)
 		opt3_latencies[1].append(latency)
@@ -143,7 +151,7 @@ for start_time, end_time, function_name, data in records:
 
 	executions_per_node[node_id][function_name] = executions_per_node[node_id].get(function_name, 0) + 1
 
-if DETAIL_MODE:
+if DETAIL_LEVEL >= 1:
 	print('Total:', num_total)
 	for node_id, d in enumerate(executions_per_node):
 		print('Node %d | total: %d | avg: %.1f/s | %s' % (
@@ -176,7 +184,7 @@ print('# of distinct functions for each node: %.1f (stddev.: %.1f)' % (
 	stdd(avg_num_df),
 ))
 
-if DETAIL_MODE:
+if DETAIL_LEVEL >= 2:
 	for timeslot, row in enumerate(per_time):
 		if timeslot > 300: continue
 		print('(%d, %.1f)' % (timeslot, avg(row.values())), end=' ')
@@ -200,14 +208,7 @@ print('CV: %.2f (sttdev.: %.2f, avg: %.2f)' % (
 	avg(avg_executions),
 ))
 
-if DETAIL_MODE:
-	# print('avg load:')
-	# for timeslot, row in enumerate(per_time):
-	# 	if timeslot > 300 or timeslot < 10: continue
-	# 	v = row.values()
-	# 	print('(%d, %.2f)' % (timeslot,  avg(v)), end=' ')
-	# print('')
-
+if DETAIL_LEVEL >= 2:
 	print('CV:')
 	for timeslot, row in enumerate(per_time):
 		if timeslot > 300 or timeslot < 10: continue
@@ -218,28 +219,42 @@ if DETAIL_MODE:
 	print('')
 
 print('\n-------------------- Cache hits --------------------')
-print('                           | Hit | Miss | %  | H.E.Time | M.E.Time')
-print('ImageReuse                 | %d | %d | %s | %dms | %dms |' % (
+print('                           |   Hit |  Miss |   % | H.E.Time | M.E.Time |')
+
+def print_row(*cols):
+	print('%s | %s | %s | %s | %sms | %sms |' % (
+		cols[0].ljust(26),
+		str(cols[1]).rjust(5),
+		str(cols[2]).rjust(5),
+		str(cols[3]).rjust(3),
+		str(round(cols[4])).rjust(6),
+		str(round(cols[5])).rjust(6),
+	))
+
+print_row(
+	'ImageReuse',
 	num_image_hit,
 	num_total - num_image_hit,
 	percentile(num_image_hit, num_total),
 	avg(opt1_execution_times[0]),
 	avg(opt1_execution_times[1]),
-))
-print('UsingPooledContainer       | %d | %d | %s | %dms | %dms |' % (
+)
+print_row(
+	'UsingPooledContainer',
 	num_using_pooled_container,
 	num_total - num_using_pooled_container,
 	percentile(num_using_pooled_container, num_total),
 	avg(opt2_execution_times[0]),
 	avg(opt2_execution_times[1]),
-))
-print('UsingExistingRestContainer | %d | %d | %s | %dms | %dms |' % (
+)
+print_row(
+	'UsingExistingRestContainer',
 	num_using_existing_rest_container,
 	num_total - num_using_existing_rest_container,
 	percentile(num_using_existing_rest_container, num_total),
 	avg(opt3_execution_times[0]),
 	avg(opt3_execution_times[1]),
-))
+)
 print('')
 
 
@@ -251,18 +266,24 @@ print('avg exec time: %dms\navg latency: %dms' % (
 ))
 print('')
 
+if DETAIL_LEVEL >= 1:
+	print('Total executions:', num_total)
 
-print('Total executions:', num_total)
-functions = sorted(durations_per_functions.keys())
-for fname in functions:
-	cnt = len(durations_per_functions[fname])
-	dur = avg(durations_per_functions[fname])
-	latency = avg(latencies_per_functions[fname])
+	tmp = sorted(durations_per_functions.items(), key=lambda e: len(e[1]), reverse=True)
+	keys = [e[0] for e in tmp]
 
-	print('%s: %dms (n=%d)(internal: %dms, latency: %dms)' % (
-		fname,
-		dur,
-		cnt,
-		dur - latency,
-		latency,
-	))
+	for fname in keys:
+		cnt = len(durations_per_functions[fname])
+		dur = avg(durations_per_functions[fname])
+		latency = avg(latencies_per_functions[fname])
+
+		print('%s: %dms (n=%d)(internal: %dms, latency: %dms)' % (
+			fname,
+			dur,
+			cnt,
+			dur - latency,
+			latency,
+		))
+
+print('avg algorithm latency: %.1fμs' % (avg(algorithm_latencies) * 1000))
+

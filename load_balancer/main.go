@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Prev/HotFunctions/load_balancer/scheduler"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
+
+	"github.com/Prev/HotFunctions/load_balancer/scheduler"
 )
 
 var logger *log.Logger
@@ -23,7 +24,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	if len(os.Args) < 2 {
-		println("Usage: go run *.go rr|ll|hash|ours|pasch [fakeMode=0]")
+		println("Usage: go run *.go rr|ll|hash|ours|pasch|tradeoff [fakeMode=0]")
 		os.Exit(-1)
 	}
 	schedType = os.Args[1]
@@ -62,6 +63,7 @@ GuessSchedType:
 		panic(err)
 	}
 }
+
 // Init node list from the config file
 func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 	nodeConfigFile, err := os.Open(configFilePath)
@@ -82,6 +84,8 @@ func initNodesFromConfig(configFilePath string) []*scheduler.Node {
 }
 
 func setScheduler(newSchedType string) error {
+	var err error
+
 	switch newSchedType {
 	case "rr":
 		// Round Robin Scheduler
@@ -96,19 +100,49 @@ func setScheduler(newSchedType string) error {
 	case "hash":
 		// Consistent Hashing Scheduler
 		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
-		println("Using Consistent Hashing Scheduler")
-		sched = scheduler.NewConsistentHashingScheduler(&nodes, 8, 8)
+		var threshold int
+		if threshold, err = strconv.Atoi(os.Getenv("T")); err != nil {
+			threshold = 8
+		}
+		fmt.Printf("Using Consistent Hashing Scheduler (t=%d)\n", threshold)
+		sched = scheduler.NewConsistentHashingScheduler(&nodes, threshold, uint(threshold))
 
 	case "pasch":
 		// Consistent Hashing Scheduler
 		// Scheduler picks the node by Consistent Hashing algorithm where key is the function name
-		println("Using PASch Extended Scheduler")
-		sched = scheduler.NewPASchExtendedScheduler(&nodes, 8)
+		var threshold int
+		if threshold, err = strconv.Atoi(os.Getenv("T")); err != nil {
+			threshold = 8
+		}
+		fmt.Printf("Using PASch Extended Scheduler (t=%d)\n", threshold)
+		sched = scheduler.NewPASchExtendedScheduler(&nodes, uint(threshold))
 
 	case "ours":
 		// Proposing Greedy Scheduler
+		var t1, t2, t3 int
+		if t1, err = strconv.Atoi(os.Getenv("T1")); err != nil {
+			t1 = 8
+		}
+		if t2, err = strconv.Atoi(os.Getenv("T2")); err != nil {
+			t2 = 5
+		}
+		if t3, err = strconv.Atoi(os.Getenv("T3")); err != nil {
+			t3 = 3
+		}
 		println("Using Our Scheduler")
-		sched = scheduler.NewOurScheduler(&nodes, 8, 5, 3)
+		sched = scheduler.NewOurScheduler(&nodes, uint(t1), uint(t2), t3)
+
+	case "tradeoff":
+		// Trade-off algorithm for exploiting locality
+		var alpha, beta float64
+		if alpha, err = strconv.ParseFloat(os.Getenv("ALPHA"), 32); err != nil {
+			alpha = 0.0
+		}
+		if beta, err = strconv.ParseFloat(os.Getenv("BETA"), 32); err != nil {
+			beta = 0.5
+		}
+		fmt.Printf("Using Trade-Off Scheduler (alpha=%.3f, beta=%.3f)\n", alpha, beta)
+		sched = scheduler.NewTradeOffScheduler(&nodes, alpha, beta)
 
 	default:
 		return errors.New("unsupported scheduler type")
